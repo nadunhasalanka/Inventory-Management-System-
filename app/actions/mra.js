@@ -45,7 +45,7 @@ export async function fiscalizeInvoice(invoiceData, isCredit = false) {
   }
 }
 
-export function generateInvoiceJSON(items, customer = null, type = "cash") {
+export async function generateInvoiceJSON(items, customer = null, type = "cash") {
   const invoiceNumber = `INV-${Date.now()}`
   const timestamp = new Date().toISOString()
 

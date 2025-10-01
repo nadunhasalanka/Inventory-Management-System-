@@ -1,0 +1,64 @@
+[
+  {
+    "_id": "MRA-LOG-001",
+    "invoiceNumber": "INV-2025-001",
+    "saleType": "cash",
+    "amount": 45.6,
+    "timestamp": "2025-10-01T09:15:23Z",
+    "status": "success",
+    "irn": "MRA2025001234567890",
+    "qrCode": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "fiscalDeviceId": "FD-001",
+    "responseTime": 1.2,
+    "retryCount": 0
+  },
+  {
+    "_id": "MRA-LOG-002",
+    "invoiceNumber": "INV-2025-002",
+    "saleType": "cash",
+    "amount": 123.4,
+    "timestamp": "2025-10-01T10:22:45Z",
+    "status": "success",
+    "irn": "MRA2025001234567891",
+    "qrCode": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "fiscalDeviceId": "FD-001",
+    "responseTime": 0.9,
+    "retryCount": 0
+  },
+  {
+    "_id": "MRA-LOG-003",
+    "invoiceNumber": "INV-2025-003",
+    "saleType": "credit",
+    "amount": 320.5,
+    "timestamp": "2025-10-01T11:30:12Z",
+    "status": "success",
+    "irn": "MRA2025001234567892",
+    "qrCode": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "fiscalDeviceId": "FD-001",
+    "responseTime": 1.5,
+    "retryCount": 0
+  },
+  {
+    "_id": "MRA-LOG-004",
+    "invoiceNumber": "INV-2025-004",
+    "saleType": "cash",
+    "amount": 67.8,
+    "timestamp": "2025-10-01T14:05:33Z",
+    "status": "failed",
+    "error": "Network timeout - please retry",
+    "fiscalDeviceId": "FD-001",
+    "responseTime": 30.0,
+    "retryCount": 3
+  },
+  {
+    "_id": "MRA-LOG-005",
+    "invoiceNumber": "INV-2025-005",
+    "saleType": "cash",
+    "amount": 89.2,
+    "timestamp": "2025-10-01T15:45:11Z",
+    "status": "pending",
+    "fiscalDeviceId": "FD-001",
+    "retryCount": 0,
+    "notes": "Awaiting MRA response"
+  }
+]

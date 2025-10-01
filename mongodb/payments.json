@@ -1,0 +1,54 @@
+[
+  {
+    "_id": "PAY-001",
+    "paymentId": 1,
+    "customerId": 1,
+    "customerName": "John Pierre",
+    "invoiceNumber": "INV-001001",
+    "amount": 100.0,
+    "paymentMethod": "cash",
+    "paymentDate": "2025-09-25T14:30:00Z",
+    "receivedBy": "Admin User",
+    "notes": "Partial payment",
+    "receiptNumber": "RCP-001001"
+  },
+  {
+    "_id": "PAY-002",
+    "paymentId": 2,
+    "customerId": 2,
+    "customerName": "Ria Patel",
+    "invoiceNumber": "INV-001002",
+    "amount": 50.0,
+    "paymentMethod": "bank_transfer",
+    "paymentDate": "2025-09-28T10:15:00Z",
+    "receivedBy": "Admin User",
+    "notes": "Bank transfer reference: TRF123456",
+    "receiptNumber": "RCP-001002"
+  },
+  {
+    "_id": "PAY-003",
+    "paymentId": 3,
+    "customerId": 3,
+    "customerName": "Ahmed Khan",
+    "invoiceNumber": "INV-000998",
+    "amount": 250.0,
+    "paymentMethod": "cash",
+    "paymentDate": "2025-09-22T16:45:00Z",
+    "receivedBy": "Admin User",
+    "notes": "Payment for old invoice",
+    "receiptNumber": "RCP-001003"
+  },
+  {
+    "_id": "PAY-004",
+    "paymentId": 4,
+    "customerId": 4,
+    "customerName": "Marie Dubois",
+    "invoiceNumber": "INV-000995",
+    "amount": 180.5,
+    "paymentMethod": "card",
+    "paymentDate": "2025-09-18T11:20:00Z",
+    "receivedBy": "Admin User",
+    "notes": "Full payment",
+    "receiptNumber": "RCP-001004"
+  }
+]

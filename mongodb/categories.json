@@ -1,0 +1,62 @@
+[
+  {
+    "_id": "CAT-001",
+    "categoryId": 1,
+    "name": "Beverage",
+    "description": "Drinks and beverages including water, juice, and soft drinks",
+    "icon": "🥤",
+    "color": "#10b981",
+    "taxRate": 5,
+    "status": "active",
+    "productCount": 45,
+    "createdAt": "2024-01-01T08:00:00Z"
+  },
+  {
+    "_id": "CAT-002",
+    "categoryId": 2,
+    "name": "Cosmetics",
+    "description": "Personal care and beauty products",
+    "icon": "💄",
+    "color": "#a78bfa",
+    "taxRate": 5,
+    "status": "active",
+    "productCount": 38,
+    "createdAt": "2024-01-01T08:00:00Z"
+  },
+  {
+    "_id": "CAT-003",
+    "categoryId": 3,
+    "name": "Stationery",
+    "description": "Office and school supplies",
+    "icon": "📝",
+    "color": "#22c55e",
+    "taxRate": 5,
+    "status": "active",
+    "productCount": 52,
+    "createdAt": "2024-01-01T08:00:00Z"
+  },
+  {
+    "_id": "CAT-004",
+    "categoryId": 4,
+    "name": "Grocery",
+    "description": "Food items and daily essentials",
+    "icon": "🛒",
+    "color": "#f59e0b",
+    "taxRate": 0,
+    "status": "active",
+    "productCount": 120,
+    "createdAt": "2024-01-01T08:00:00Z"
+  },
+  {
+    "_id": "CAT-005",
+    "categoryId": 5,
+    "name": "Electronics",
+    "description": "Electronic devices and accessories",
+    "icon": "📱",
+    "color": "#3b82f6",
+    "taxRate": 15,
+    "status": "active",
+    "productCount": 28,
+    "createdAt": "2024-01-01T08:00:00Z"
+  }
+]

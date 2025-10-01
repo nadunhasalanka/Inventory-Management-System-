@@ -1,0 +1,153 @@
+[
+  {
+    "_id": "INV-001001",
+    "invoiceNumber": "INV-001001",
+    "customerId": 1,
+    "customerName": "John Pierre",
+    "saleType": "credit",
+    "items": [
+      {
+        "sku": "SKU-1000",
+        "name": "Mineral Water 1L",
+        "quantity": 24,
+        "unitPrice": 0.6,
+        "total": 14.4
+      },
+      {
+        "sku": "SKU-1006",
+        "name": "Bread White Loaf",
+        "quantity": 10,
+        "unitPrice": 1.2,
+        "total": 12.0
+      },
+      {
+        "sku": "SKU-1007",
+        "name": "Rice Basmati 1kg",
+        "quantity": 5,
+        "unitPrice": 3.8,
+        "total": 19.0
+      }
+    ],
+    "subtotal": 45.4,
+    "tax": 2.27,
+    "total": 47.67,
+    "amountPaid": 0,
+    "amountDue": 47.67,
+    "paymentStatus": "pending",
+    "paymentMethod": "credit",
+    "dueDate": "2025-10-05T23:59:59Z",
+    "saleDate": "2025-09-15T14:20:00Z",
+    "cashier": "Admin User",
+    "mraStatus": "fiscalized",
+    "mraIRN": "MRA2025001234567892",
+    "notes": "Customer requested 15-day credit"
+  },
+  {
+    "_id": "INV-001002",
+    "invoiceNumber": "INV-001002",
+    "customerId": 2,
+    "customerName": "Ria Patel",
+    "saleType": "credit",
+    "items": [
+      {
+        "sku": "SKU-1001",
+        "name": "Toothpaste FreshMint",
+        "quantity": 6,
+        "unitPrice": 2.1,
+        "total": 12.6
+      },
+      {
+        "sku": "SKU-1004",
+        "name": "Shampoo Herbal 250ml",
+        "quantity": 3,
+        "unitPrice": 4.8,
+        "total": 14.4
+      }
+    ],
+    "subtotal": 27.0,
+    "tax": 1.35,
+    "total": 28.35,
+    "amountPaid": 0,
+    "amountDue": 28.35,
+    "paymentStatus": "pending",
+    "paymentMethod": "credit",
+    "dueDate": "2025-10-02T23:59:59Z",
+    "saleDate": "2025-09-20T11:30:00Z",
+    "cashier": "Admin User",
+    "mraStatus": "fiscalized",
+    "mraIRN": "MRA2025001234567893",
+    "notes": ""
+  },
+  {
+    "_id": "INV-001003",
+    "invoiceNumber": "INV-001003",
+    "customerId": null,
+    "customerName": "Walk-in Customer",
+    "saleType": "cash",
+    "items": [
+      {
+        "sku": "SKU-1000",
+        "name": "Mineral Water 1L",
+        "quantity": 12,
+        "unitPrice": 0.6,
+        "total": 7.2
+      },
+      {
+        "sku": "SKU-1003",
+        "name": "Orange Juice 500ml",
+        "quantity": 6,
+        "unitPrice": 1.4,
+        "total": 8.4
+      }
+    ],
+    "subtotal": 15.6,
+    "tax": 0.78,
+    "total": 16.38,
+    "amountPaid": 20.0,
+    "amountDue": 0,
+    "change": 3.62,
+    "paymentStatus": "paid",
+    "paymentMethod": "cash",
+    "saleDate": "2025-10-01T09:15:00Z",
+    "cashier": "Admin User",
+    "mraStatus": "fiscalized",
+    "mraIRN": "MRA2025001234567894",
+    "notes": ""
+  },
+  {
+    "_id": "INV-001004",
+    "invoiceNumber": "INV-001004",
+    "customerId": null,
+    "customerName": "Walk-in Customer",
+    "saleType": "cash",
+    "items": [
+      {
+        "sku": "SKU-1002",
+        "name": "Notebook A5",
+        "quantity": 3,
+        "unitPrice": 3.2,
+        "total": 9.6
+      },
+      {
+        "sku": "SKU-1005",
+        "name": "Pen Blue Pack of 10",
+        "quantity": 2,
+        "unitPrice": 2.9,
+        "total": 5.8
+      }
+    ],
+    "subtotal": 15.4,
+    "tax": 0.77,
+    "total": 16.17,
+    "amountPaid": 16.17,
+    "amountDue": 0,
+    "change": 0,
+    "paymentStatus": "paid",
+    "paymentMethod": "card",
+    "saleDate": "2025-10-01T10:45:00Z",
+    "cashier": "Admin User",
+    "mraStatus": "fiscalized",
+    "mraIRN": "MRA2025001234567895",
+    "notes": ""
+  }
+]

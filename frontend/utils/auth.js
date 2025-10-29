@@ -1,4 +1,6 @@
 // Authentication and user management utilities
+import { rolePermissions } from "./permissions"
+import demoUsers from "../mongodb/users.json"
 
 // Get current logged-in user
 export function getCurrentUser() {
@@ -133,40 +135,6 @@ export function hasPermission(permission) {
   const user = getCurrentUser()
   if (!user) return false
 
-  const rolePermissions = {
-    admin: ["all"],
-    manager: [
-      "view_dashboard",
-      "view_inventory",
-      "edit_inventory",
-      "view_sales",
-      "create_sales",
-      "view_customers",
-      "edit_customers",
-      "view_suppliers",
-      "edit_suppliers",
-      "view_reports",
-      "view_activity_logs",
-      "manage_users",
-    ],
-    cashier: [
-      "view_dashboard",
-      "view_inventory",
-      "create_sales",
-      "view_customers",
-      "view_quotations",
-      "create_quotations",
-    ],
-    inventory_manager: [
-      "view_dashboard",
-      "view_inventory",
-      "edit_inventory",
-      "view_suppliers",
-      "edit_suppliers",
-      "view_reports",
-    ],
-  }
-
   const permissions = rolePermissions[user.role] || []
   return permissions.includes("all") || permissions.includes(permission)
 }
@@ -174,19 +142,33 @@ export function hasPermission(permission) {
 // Initialize default admin user if no users exist
 export function initializeDefaultUser() {
   const users = getUsers()
+  const mappedDemo = (demoUsers || []).map((u, idx) => ({
+    id: u._id || String(idx + 1),
+    name: `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.username || "User",
+    email: u.email,
+    password: u.password || u.passwordPlain || "admin123", // demo only
+    role: (u.role || "staff").toLowerCase().replace(" ", "_"),
+    status: u.status || "active",
+    createdAt: u.createdAt || new Date().toISOString(),
+    createdBy: "system",
+  }))
+
   if (users.length === 0) {
-    const defaultAdmin = {
-      id: "1",
-      name: "Admin",
-      email: "admin@ims.local",
-      password: "admin123", // In production, this should be hashed
-      role: "admin",
-      status: "active",
-      createdAt: new Date().toISOString(),
-      createdBy: "system",
+    localStorage.setItem("users", JSON.stringify(mappedDemo))
+    return mappedDemo[0] || null
+  }
+
+  // Merge in any missing demo users by email
+  const existingEmails = new Set(users.map((u) => u.email))
+  let added = 0
+  mappedDemo.forEach((demo) => {
+    if (demo.email && !existingEmails.has(demo.email)) {
+      users.push(demo)
+      added++
     }
-    localStorage.setItem("users", JSON.stringify([defaultAdmin]))
-    return defaultAdmin
+  })
+  if (added > 0) {
+    localStorage.setItem("users", JSON.stringify(users))
   }
   return null
 }

@@ -1,0 +1,38 @@
+[
+  {
+    "_id": "USER-ADMIN",
+    "username": "admin",
+    "email": "admin@ims.local",
+    "firstName": "Admin",
+    "lastName": "User",
+    "role": "admin",
+    "status": "active",
+    "createdAt": "2024-01-01T08:00:00Z",
+    "password": "admin123",
+    "notes": "Demo administrator"
+  },
+  {
+    "_id": "USER-WH",
+    "username": "warehouse",
+    "email": "wh@ims.local",
+    "firstName": "Warehouse",
+    "lastName": "Manager",
+    "role": "warehouse_manager",
+    "status": "active",
+    "createdAt": "2024-03-15T09:00:00Z",
+    "password": "warehouse123",
+    "notes": "Demo warehouse manager"
+  },
+  {
+    "_id": "USER-STAFF",
+    "username": "staff",
+    "email": "staff@ims.local",
+    "firstName": "Staff",
+    "lastName": "User",
+    "role": "staff",
+    "status": "active",
+    "createdAt": "2024-06-20T11:00:00Z",
+    "password": "staff123",
+    "notes": "Demo staff"
+  }
+]

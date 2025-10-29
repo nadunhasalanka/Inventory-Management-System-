@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Box, Card, CardContent, TextField, Button, Typography, Alert, InputAdornment, IconButton } from "@mui/material"
 import { Visibility, VisibilityOff, Lock, Email } from "@mui/icons-material"
 import { login, initializeDefaultUser } from "../utils/auth"
@@ -12,8 +12,8 @@ export default function LoginScreen({ onLoginSuccess }) {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
-  // Initialize default admin on component mount
-  useState(() => {
+  // Initialize demo users on component mount
+  useEffect(() => {
     initializeDefaultUser()
   }, [])
 
@@ -67,13 +67,10 @@ export default function LoginScreen({ onLoginSuccess }) {
           )}
 
           <Alert severity="info" className="mb-4 rounded-xl bg-accent/50">
-            <Typography variant="caption" className="block">
-              <strong>Default Login:</strong>
-            </Typography>
-            <Typography variant="caption" className="block">
-              Email: admin@ims.local
-            </Typography>
-            <Typography variant="caption">Password: admin123</Typography>
+            <Typography variant="caption" className="block font-semibold">Demo Logins:</Typography>
+            <Typography variant="caption" className="block">Admin — Email: admin@ims.local — Password: admin123</Typography>
+            <Typography variant="caption" className="block">Warehouse Manager — Email: wh@ims.local — Password: warehouse123</Typography>
+            <Typography variant="caption" className="block">Staff — Email: staff@ims.local — Password: staff123</Typography>
           </Alert>
 
           <form onSubmit={handleLogin} className="space-y-4">

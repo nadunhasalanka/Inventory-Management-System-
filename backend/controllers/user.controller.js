@@ -1,13 +1,37 @@
-// GET /api/users
-exports.getUsers = (req, res) => {
-    // 1. In a real app, you would call: userService.findAllUsers()
-    const users = [{ id: 1, name: 'nadun' }, { id: 2, name: 'expert' }]; 
-    
-    // 2. Send the standardized response
-    res.status(200).json({
-        success: true,
-        data: users
-    });
+const User = require('../models/User.model');
+
+
+exports.getUsers = async (req, res) => {
+try {
+        const users = await User.find(); 
+        
+        res.status(200).json({
+            success: true,
+            count: users.length,
+            data: users
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+// GET /api/users/:id
+// (Gets a single user by ID)
+exports.getUserById = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+        
+        res.status(200).json({
+            success: true,
+            data: user
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
 };
 
 // Example POST /api/users

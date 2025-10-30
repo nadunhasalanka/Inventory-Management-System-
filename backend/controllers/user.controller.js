@@ -1,38 +1,29 @@
 const User = require('../models/User.model');
+const asyncHandler = require('../middleware/asyncHandler');
 
-
-exports.getUsers = async (req, res) => {
-try {
-        const users = await User.find(); 
-        
-        res.status(200).json({
-            success: true,
-            count: users.length,
-            data: users
-        });
-    } catch (err) {
-        res.status(500).json({ success: false, message: 'Server Error' });
-    }
-};
+exports.getUsers = asyncHandler(async (req, res) => {
+    const users = await User.find(); 
+    res.status(200).json({
+        success: true,
+        count: users.length,
+        data: users
+    });
+});
 
 // GET /api/users/:id
 // (Gets a single user by ID)
-exports.getUserById = async (req, res) => {
-    try {
-        const user = await User.findById(req.params.id);
+exports.getUserById = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.params.id).select('-password');
 
-        if (!user) {
-            return res.status(404).json({ success: false, message: 'User not found' });
-        }
-        
-        res.status(200).json({
-            success: true,
-            data: user
-        });
-    } catch (err) {
-        res.status(500).json({ success: false, message: 'Server Error' });
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
     }
-};
+    
+    res.status(200).json({
+        success: true,
+        data: user
+    });
+});
 
 // Example POST /api/users
 exports.createUser = (req, res) => {

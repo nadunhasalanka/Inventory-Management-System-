@@ -7,6 +7,8 @@ const cors = require('cors');
 
 const userRoutes = require('./routes/user.routes');
 const authRoutes = require('./routes/auth.routes');
+const productRoutes = require('./routes/product.routes');
+const categoryRoutes = require('./routes/category.routes');
 
 const app = express();
 
@@ -42,6 +44,12 @@ app.use('/api/auth', authRoutes);
 
 // --- Route Middleware ---
 app.use('/api/users', userRoutes);
+ 
+// Product Routes
+app.use('/api/products', productRoutes);
+
+// Category Routes
+app.use('/api/categories', categoryRoutes);
 
 
 // 1. Catch 404 - If a request reaches here, no route handled it

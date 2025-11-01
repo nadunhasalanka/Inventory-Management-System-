@@ -9,6 +9,8 @@ const userRoutes = require('./routes/user.routes');
 const authRoutes = require('./routes/auth.routes');
 const productRoutes = require('./routes/product.routes');
 const categoryRoutes = require('./routes/category.routes');
+const customerRoutes = require('./routes/customer.routes');
+const supplierRoutes = require('./routes/supplier.routes');
 
 const app = express();
 
@@ -50,6 +52,12 @@ app.use('/api/products', productRoutes);
 
 // Category Routes
 app.use('/api/categories', categoryRoutes);
+
+// Customer Routes
+app.use('/api/customers', customerRoutes);
+
+/// Supplier Routes
+app.use('/api/suppliers', supplierRoutes);
 
 
 // 1. Catch 404 - If a request reaches here, no route handled it

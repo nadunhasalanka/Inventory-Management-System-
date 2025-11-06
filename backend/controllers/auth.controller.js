@@ -81,3 +81,23 @@ exports.logout = (req, res, next) => {
         data: {}
     });
 };
+
+exports.getMe = async (req, res, next) => {
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.status(200).json({
+        success: true,
+        user: {
+            id: user._id,
+            role: user.role,
+            email: user.email,
+            username: user.username,
+            first_name: user.first_name,
+            last_name: user.last_name
+        }
+    });
+};

@@ -57,7 +57,8 @@ const GRNSchema = new mongoose.Schema({
         type: String, 
         required: true, 
         trim: true, 
-        unique: true 
+        unique: true,
+        sparse: true
     },
     received_date: { 
         type: Date, 

@@ -1,7 +1,7 @@
 const Product = require('../models/Product.model');
 const Category = require('../models/Category.model');
 const InventoryStock = require('../models/Inventory_Stock.model');
-const asyncHandler = require('../middleware/asyncHandler'); // Import our utility
+const asyncHandler = require('../middleware/asyncHandler');
 
 //  @route   POST /api/products
 exports.createProduct = asyncHandler(async (req, res, next) => {

@@ -4,7 +4,8 @@ const {
     getCustomers,
     getCustomerById,
     updateCustomer,
-    deleteCustomer
+    deleteCustomer,
+    payBalance
 } = require('../controllers/customer.controller');
 
 const { protect } = require('../middleware/auth.middleware');
@@ -26,5 +27,9 @@ router.route('/:id')
     .get(getCustomerById) // Publicly viewable
     .put(protect, authorize('Admin', 'Manager'), updateCustomer)
     .delete(protect, authorize('Admin'), deleteCustomer);
+
+// @route   POST /api/customers/:id/pay-balance
+router.route('/:id/pay-balance')
+    .post(protect, authorize('Admin', 'Manager', 'Staff'),payBalance);
 
 module.exports = router;

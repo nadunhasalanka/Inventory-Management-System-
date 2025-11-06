@@ -82,7 +82,7 @@ const SalesOrderSchema = new mongoose.Schema({
     payment_status: {
         type: String,
         required: true,
-        enum: ['Pending Credit', 'Paid', 'Refunded', 'Pending Payment'],
+        enum: ['Pending Credit', 'Paid', 'Refunded', 'Pending Payment', 'Partially Paid'],
         default: 'Pending Payment'
     },
     

@@ -4,6 +4,7 @@ const connectDB = require('./config/db');
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 
 const userRoutes = require('./routes/user.routes');
 const authRoutes = require('./routes/auth.routes');
@@ -31,13 +32,15 @@ app.use((req, res, next) => {
 });
 
 app.use(cors({
-    origin: "*",
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    // This must be your exact frontend origin
+    // We assume it's localhost:3000 for development
+    origin: 'http://localhost:3000', 
+    credentials: true // <-- Allows the browser to send cookies
 }));
 // Ensure preflight requests are handled
 // Express 5 no longer supports '*' in route paths with path-to-regexp; use a regex
-app.options(/.*/, cors());
+// app.options(/.*/, cors());
+app.use(cookieParser());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

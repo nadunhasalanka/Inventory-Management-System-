@@ -5,7 +5,7 @@ import { Section } from "../components/common"
 import { Card, CardContent, Typography, Tabs, Tab, TextField, Button } from "@mui/material"
 import UserManagement from "../components/UserManagement"
 import ActivityLogs from "../components/ActivityLogs"
-import { hasPermission } from "../utils/auth"
+import { hasPermission } from "../utils/old.auth"
 
 export default function Settings() {
   const [tab, setTab] = useState(0)

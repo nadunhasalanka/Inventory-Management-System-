@@ -1,38 +1,38 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Box, Card, CardContent, TextField, Button, Typography, Alert, InputAdornment, IconButton } from "@mui/material"
+import { Box, Card, CardContent, TextField, Button, Typography, Alert, InputAdornment, IconButton, Link } from "@mui/material"
 import { Visibility, VisibilityOff, Lock, Email } from "@mui/icons-material"
-import { login, initializeDefaultUser } from "../utils/auth"
+import { login } from "../utils/auth"
 
-export default function LoginScreen({ onLoginSuccess }) {
+export default function LoginScreen({ onLoginSuccess, onSwitchToSignup }) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
-  // Initialize demo users on component mount
-  useEffect(() => {
-    initializeDefaultUser()
-  }, [])
+  // No local seeding when using backend auth
+  useEffect(() => {}, [])
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault()
     setError("")
     setLoading(true)
 
-    setTimeout(() => {
-      const result = login(email, password)
-
-      if (result.success) {
-        onLoginSuccess(result.user)
+    try {
+      const user = await login(email, password)
+      if (user) {
+        onLoginSuccess(user)
       } else {
-        setError(result.error)
+        setError("Invalid credentials")
       }
-
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || "Login failed"
+      setError(msg)
+    } finally {
       setLoading(false)
-    }, 500)
+    }
   }
 
   return (
@@ -66,14 +66,7 @@ export default function LoginScreen({ onLoginSuccess }) {
             </Alert>
           )}
 
-          <Alert severity="info" className="mb-4 rounded-xl bg-accent/50">
-            <Typography variant="caption" className="block font-semibold">Demo Logins:</Typography>
-            <Typography variant="caption" className="block">Admin — Email: admin@ims.local — Password: admin123</Typography>
-            <Typography variant="caption" className="block">Warehouse Manager — Email: wh@ims.local — Password: warehouse123</Typography>
-            <Typography variant="caption" className="block">Staff — Email: staff@ims.local — Password: staff123</Typography>
-          </Alert>
-
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin}>
             <TextField
               fullWidth
               label="Email"
@@ -81,6 +74,7 @@ export default function LoginScreen({ onLoginSuccess }) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              margin="normal"
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -97,6 +91,7 @@ export default function LoginScreen({ onLoginSuccess }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              margin="normal"
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -133,9 +128,17 @@ export default function LoginScreen({ onLoginSuccess }) {
             </Button>
           </form>
 
-          <Typography variant="caption" className="block text-center mt-6 text-muted-foreground">
-            Secure access to your inventory system
-          </Typography>
+          <Box mt={4} textAlign="center">
+            <Typography variant="caption" className="text-muted-foreground block mb-2">
+              Secure access to your inventory system
+            </Typography>
+            <Typography variant="caption">
+              Don't have an account?{' '}
+              <Link component="button" underline="hover" onClick={onSwitchToSignup} sx={{ fontWeight: 600 }}>
+                Sign up
+              </Link>
+            </Typography>
+          </Box>
         </CardContent>
       </Card>
     </Box>

@@ -21,7 +21,7 @@ import {
   TablePagination,
 } from "@mui/material"
 import { Refresh, Download } from "@mui/icons-material"
-import { getActivityLogs, getUsers } from "../utils/auth"
+import { getActivityLogs, getUsers } from "../utils/old.auth"
 
 export default function ActivityLogs() {
   const [logs, setLogs] = useState([])

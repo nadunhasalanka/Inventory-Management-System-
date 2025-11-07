@@ -14,7 +14,12 @@ export default function TopBar({ onOpenSidebar, currentUser, onLogout }) {
       sx={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
     >
       <Toolbar>
-        <IconButton edge="start" onClick={onOpenSidebar} className="md:hidden text-primary-foreground">
+        <IconButton
+          edge="start"
+          onClick={onOpenSidebar}
+          aria-label="Open menu"
+          sx={{ display: { xs: "inline-flex", md: "none" }, color: "var(--primary-foreground)" }}
+        >
           <MenuIcon />
         </IconButton>
         <Typography variant="h6" noWrap component="div" className="font-semibold text-primary-foreground">

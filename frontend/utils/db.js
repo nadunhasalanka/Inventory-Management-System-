@@ -310,4 +310,4 @@ export function findItemByBarcode(barcode) {
   return items.find((item) => item.barcode === barcode || item.sku === barcode)
 }
 
-import { logActivity } from "./auth"
+import { logActivity } from "./old.auth"

@@ -26,7 +26,7 @@ import {
   Alert,
 } from "@mui/material"
 import { Edit, Delete, PersonAdd } from "@mui/icons-material"
-import { getUsers, addUser, updateUser, deleteUser, getCurrentUser } from "../utils/auth"
+import { getUsers, addUser, updateUser, deleteUser, getCurrentUser } from "../utils/old.auth"
 
 export default function UserManagement() {
   const [users, setUsers] = useState([])

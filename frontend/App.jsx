@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from "react"
 import { Box, Toolbar } from "@mui/material"
 import { getCurrentUser, logout, hasPermission } from "./utils/auth"
 import LoginScreen from "./components/LoginScreen"
+import SignupScreen from "./components/SignupScreen"
 import TopBar from "./components/layout/TopBar"
 import Sidebar from "./components/layout/Sidebar"
 import { tabs as allTabs, tabPermissions } from "./config/tabs"
@@ -14,13 +15,16 @@ export default function App() {
   const [active, setActive] = useState("dashboard")
   const [currentUser, setCurrentUser] = useState(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [authMode, setAuthMode] = useState("login")
 
   useEffect(() => {
-    const user = getCurrentUser()
-    if (user) {
-      setCurrentUser(user)
-      setIsAuthenticated(true)
-    }
+    (async () => {
+      const user = await getCurrentUser()
+      if (user) {
+        setCurrentUser(user)
+        setIsAuthenticated(true)
+      }
+    })()
   }, [])
 
   const handleLoginSuccess = (user) => {
@@ -28,8 +32,8 @@ export default function App() {
     setIsAuthenticated(true)
   }
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     setCurrentUser(null)
     setIsAuthenticated(false)
     setActive("dashboard")
@@ -38,14 +42,17 @@ export default function App() {
   const visibleTabs = useMemo(() => {
     if (!currentUser) return allTabs
     return allTabs.filter((tab) => {
-      if (currentUser.role === "admin") return true
+      if ((currentUser.role || "").toLowerCase() === "admin") return true
       const required = tabPermissions[tab.key]
       return hasPermission(required)
     })
   }, [currentUser])
 
   if (!isAuthenticated) {
-    return <LoginScreen onLoginSuccess={handleLoginSuccess} />
+    if (authMode === "signup") {
+      return <SignupScreen onSwitchToLogin={() => setAuthMode("login")} />
+    }
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} onSwitchToSignup={() => setAuthMode("signup")} />
   }
 
   return (
@@ -59,8 +66,7 @@ export default function App() {
         mobileOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
       />
-
-      <Box component="main" sx={{ flexGrow: 1, p: 3 }} className="bg-background min-h-screen">
+      <Box component="main" sx={{ flexGrow: 1, p: 3, height: "100vh", overflow: "auto" }} className="bg-background">
         <Toolbar />
         <div className="max-w-[1400px] mx-auto">{getViewByKey(active)}</div>
       </Box>

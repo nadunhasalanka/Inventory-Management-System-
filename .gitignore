@@ -7,3 +7,4 @@ backend/.env
 
 # Ignore package-lock.json in frontend
 frontend/package-lock.json
+frontend/node_modules

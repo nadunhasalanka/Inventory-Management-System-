@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useEffect, useRef, useState } from "react"
+import { usePathname, useRouter } from "next/navigation"
 import { Drawer, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Box, IconButton, Tooltip } from "@mui/material"
 import { ChevronLeft, ChevronRight } from "@mui/icons-material"
 
@@ -15,6 +16,8 @@ export default function Sidebar({ currentUser, tabs, active, onSelect, mobileOpe
   const startXRef = useRef(0)
   const startWidthRef = useRef(0)
   const lastExpandedRef = useRef(DEFAULT_WIDTH)
+  const router = useRouter()
+  const pathname = usePathname()
 
   // Hydrate width/collapsed from localStorage on client only
   useEffect(() => {
@@ -116,8 +119,11 @@ export default function Sidebar({ currentUser, tabs, active, onSelect, mobileOpe
             {tabs.map((t) => (
               <ListItemButton
                 key={t.key}
-                selected={active === t.key}
-                onClick={() => onSelect(t.key)}
+                selected={t.path ? pathname === t.path : active === t.key}
+                onClick={() => {
+                  if (t.path) router.push(t.path)
+                  else onSelect(t.key)
+                }}
                 className="rounded-xl"
                 sx={{
                   height: 48,
@@ -138,7 +144,7 @@ export default function Sidebar({ currentUser, tabs, active, onSelect, mobileOpe
                   },
                 }}
               >
-                <ListItemIcon sx={{ color: active === t.key ? "var(--primary)" : "inherit" }}>{t.icon}</ListItemIcon>
+                <ListItemIcon sx={{ color: (t.path ? pathname === t.path : active === t.key) ? "var(--primary)" : "inherit" }}>{t.icon}</ListItemIcon>
                 {!collapsed && (
                   <ListItemText
                     primary={t.label}
@@ -191,13 +197,16 @@ export default function Sidebar({ currentUser, tabs, active, onSelect, mobileOpe
             {tabs.map((t) => (
               <ListItemButton
                 key={t.key}
-                selected={active === t.key}
-                onClick={() => onSelect(t.key)}
+                selected={t.path ? pathname === t.path : active === t.key}
+                onClick={() => {
+                  if (t.path) router.push(t.path)
+                  else onSelect(t.key)
+                }}
                 sx={{
                   "&.Mui-selected": { backgroundColor: "var(--sidebar-accent)", color: "var(--sidebar-accent-foreground)" },
                 }}
               >
-                <ListItemIcon sx={{ color: active === t.key ? "var(--primary)" : "inherit" }}>{t.icon}</ListItemIcon>
+                <ListItemIcon sx={{ color: (t.path ? pathname === t.path : active === t.key) ? "var(--primary)" : "inherit" }}>{t.icon}</ListItemIcon>
                 <ListItemText primary={t.label} />
               </ListItemButton>
             ))}

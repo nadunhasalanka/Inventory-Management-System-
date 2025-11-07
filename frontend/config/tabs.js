@@ -18,20 +18,20 @@ import {
 } from "@mui/icons-material"
 
 export const tabs = [
-  { key: "dashboard", label: "Dashboard", icon: <DashboardIcon /> },
-  { key: "inventory", label: "Inventory", icon: <InventoryIcon /> },
-  { key: "addedit", label: "Add / Edit Items", icon: <AddBoxIcon /> },
-  { key: "quotations", label: "Quotations", icon: <QuoteIcon /> },
-  { key: "cashsales", label: "Cash Sales", icon: <POSIcon /> },
-  { key: "creditsales", label: "Credit Sales", icon: <ReceiptIcon /> },
-  { key: "returns", label: "Returns & Refunds", icon: <ReturnIcon /> },
-  { key: "customers", label: "Customers", icon: <PeopleIcon /> },
-  { key: "indebted", label: "Indebted Clients", icon: <BalanceIcon /> },
-  { key: "suppliers", label: "Suppliers", icon: <ShippingIcon /> },
-  { key: "todo", label: "To-Do List", icon: <ChecklistIcon /> },
-  { key: "subscription", label: "Subscription", icon: <VerifiedIcon /> },
-  { key: "settings", label: "Settings", icon: <SettingsIcon /> },
-  { key: "mraCompliance", label: "MRA Compliance", icon: <VerifiedUserIcon /> },
+  { key: "dashboard", label: "Dashboard", icon: <DashboardIcon />, path: "/dashboard" },
+  { key: "inventory", label: "Inventory", icon: <InventoryIcon />, path: "/inventory" },
+  { key: "addedit", label: "Add / Edit Items", icon: <AddBoxIcon />, path: "/addedit" },
+  { key: "quotations", label: "Quotations", icon: <QuoteIcon />, path: "/quotations" },
+  { key: "cashsales", label: "Cash Sales", icon: <POSIcon />, path: "/cashsales" },
+  { key: "creditsales", label: "Credit Sales", icon: <ReceiptIcon />, path: "/creditsales" },
+  { key: "returns", label: "Returns & Refunds", icon: <ReturnIcon />, path: "/returns" },
+  { key: "customers", label: "Customers", icon: <PeopleIcon />, path: "/customers" },
+  { key: "indebted", label: "Indebted Clients", icon: <BalanceIcon />, path: "/indebted" },
+  { key: "suppliers", label: "Suppliers", icon: <ShippingIcon />, path: "/suppliers" },
+  { key: "todo", label: "To-Do List", icon: <ChecklistIcon />, path: "/todo" },
+  { key: "subscription", label: "Subscription", icon: <VerifiedIcon />, path: "/subscription" },
+  { key: "settings", label: "Settings", icon: <SettingsIcon />, path: "/settings" },
+  { key: "mraCompliance", label: "MRA Compliance", icon: <VerifiedUserIcon />, path: "/mra-compliance" },
 ]
 
 // Permission required to access each tab

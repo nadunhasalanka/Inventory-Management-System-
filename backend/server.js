@@ -24,6 +24,8 @@ try {
     returnsRoutes = require('./routes/returnsExchange.routes');
 }
 const checkoutRoutes = require('./routes/checkout.routes');
+const notificationRoutes = require('./routes/notification.routes');
+const { startEmailScheduler } = require('./jobs/emailScheduler');
 
 const app = express();
 
@@ -92,6 +94,9 @@ app.use('/api/returns', returnsRoutes);
 // pos sale
 app.use('/api/checkout', checkoutRoutes);
 
+// Notification routes (email reminders)
+app.use('/api/notifications', notificationRoutes);
+
 
 // 1. Catch 404 - If a request reaches here, no route handled it
 app.use((req, res, next) => {
@@ -125,4 +130,9 @@ connectDB();
 // Start the server
 app.listen(PORT, () => {
     console.log(`Server is running on : ${PORT}`);
+    
+    // Start email scheduler after server starts
+    startEmailScheduler().catch(err => {
+        console.error('Failed to start email scheduler:', err);
+    });
 });

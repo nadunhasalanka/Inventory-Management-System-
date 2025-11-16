@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Reminder</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+      border-radius: 10px 10px 0 0;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+    .content {
+      background: #f9f9f9;
+      padding: 30px;
+      border-left: 4px solid #10b981;
+      border-right: 4px solid #10b981;
+    }
+    .alert-box {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 5px;
+    }
+    .alert-box.danger {
+      background: #f8d7da;
+      border-left-color: #dc3545;
+    }
+    .summary {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .summary-item:last-child {
+      border-bottom: none;
+    }
+    .summary-item .label {
+      color: #666;
+      font-weight: normal;
+    }
+    .summary-item .value {
+      font-weight: bold;
+      color: #333;
+    }
+    .summary-item .value.danger {
+      color: #dc3545;
+    }
+    .orders-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .orders-table th {
+      background: #10b981;
+      color: white;
+      padding: 12px;
+      text-align: left;
+      font-weight: bold;
+    }
+    .orders-table td {
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+    }
+    .orders-table tr:last-child td {
+      border-bottom: none;
+    }
+    .orders-table tr:hover {
+      background: #f5f5f5;
+    }
+    .btn {
+      display: inline-block;
+      padding: 12px 30px;
+      background: #10b981;
+      color: white !important;
+      text-decoration: none;
+      border-radius: 5px;
+      font-weight: bold;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .btn:hover {
+      background: #059669;
+    }
+    .footer {
+      background: #333;
+      color: #fff;
+      padding: 20px;
+      text-align: center;
+      border-radius: 0 0 10px 10px;
+      font-size: 14px;
+    }
+    .footer a {
+      color: #10b981;
+      text-decoration: none;
+    }
+    .contact-info {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+      border-left: 4px solid #10b981;
+    }
+    .contact-info h3 {
+      margin-top: 0;
+      color: #10b981;
+    }
+    .contact-info a {
+      color: #10b981;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>⚠️ Payment Reminder</h1>
+  </div>
+
+  <div class="content">
+    <p>Dear <strong>{{customerName}}</strong>,</p>
+
+    <p>We hope this message finds you well. This is a friendly reminder regarding outstanding payments on your account with <strong>{{companyName}}</strong>.</p>
+
+    {{#if (gt daysOverdue 30)}}
+    <div class="alert-box danger">
+      <strong>⚠️ Urgent:</strong> Your payment is significantly overdue. Please contact us immediately to avoid any service interruption.
+    </div>
+    {{else}}
+    <div class="alert-box">
+      <strong>Notice:</strong> We have detected overdue payments on your account. Please review the details below and settle the outstanding balance at your earliest convenience.
+    </div>
+    {{/if}}
+
+    <h3 style="color: #10b981;">Overdue Orders Details</h3>
+    <table class="orders-table">
+      <thead>
+        <tr>
+          <th>Order #</th>
+          <th>Order Date</th>
+          <th>Due Date</th>
+          <th>Amount Due</th>
+          <th>Days Late</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each orders}}
+        <tr>
+          <td><strong>{{this.orderNumber}}</strong></td>
+          <td>{{formatDate this.orderDate}}</td>
+          <td>{{formatDate this.dueDate}}</td>
+          <td><strong>{{currency this.amount}}</strong></td>
+          <td style="color: #dc3545;">{{this.daysOverdue}} days</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+
+    <div class="contact-info">
+      <h3>� Contact Information</h3>
+      <ul style="list-style: none; padding: 0;">
+        <li>📧 Email: <a href="mailto:{{contactEmail}}">{{contactEmail}}</a></li>
+        {{#if contactPhone}}
+        <li>📞 Phone: {{contactPhone}}</li>
+        {{/if}}
+      </ul>
+    </div>
+
+    <p>We understand that circumstances can sometimes make it difficult to meet payment deadlines. If you're experiencing financial difficulties or have any questions about these charges, please don't hesitate to reach out to us. We're here to help find a solution that works for both parties.</p>
+
+    <p><strong>Please settle this balance as soon as possible to maintain your account in good standing.</strong></p>
+
+    <p>Thank you for your prompt attention to this matter and for your continued business.</p>
+
+    <p>Best regards,<br>
+    <strong>{{companyName}} Team</strong></p>
+  </div>
+
+  <div class="footer">
+    <p>This is an automated reminder email from {{companyName}}</p>
+    <p>© {{currentYear}} {{companyName}}. All rights reserved.</p>
+    <p style="font-size: 12px; color: #999; margin-top: 10px;">
+      Please do not reply directly to this email. For assistance, contact us at <a href="mailto:{{contactEmail}}">{{contactEmail}}</a>
+    </p>
+  </div>
+</body>
+</html>

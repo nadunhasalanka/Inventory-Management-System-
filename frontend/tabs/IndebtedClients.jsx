@@ -36,9 +36,11 @@ import {
   WhatsApp as WhatsAppIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
+  Email as EmailIcon,
 } from "@mui/icons-material"
 import { Section } from "../components/common"
 import { fetchOverdueCustomers, payCustomerOrder, payCustomerBalance } from "../services/customersApi"
+import api from "../utils/api"
 
 export default function IndebtedClients() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -96,6 +98,28 @@ export default function IndebtedClients() {
     },
     onError: (error) => {
       alert(error?.response?.data?.message || "Payment failed")
+    },
+  })
+
+  // Email reminder mutation for specific customer
+  const emailReminderMutation = useMutation({
+    mutationFn: (customerId) => api.post(`/notifications/customers/${customerId}/send-reminder`),
+    onSuccess: () => {
+      alert("Email reminder is being sent in the background!")
+    },
+    onError: (error) => {
+      alert(error?.response?.data?.message || "Failed to send email reminder")
+    },
+  })
+
+  // Email reminder mutation for all overdue customers
+  const emailAllMutation = useMutation({
+    mutationFn: (minDaysOverdue = 0) => api.post(`/notifications/send-all-reminders?minDaysOverdue=${minDaysOverdue}`),
+    onSuccess: (response) => {
+      alert(`Sending email reminders to ${response.data.totalCustomers} customers in the background!`)
+    },
+    onError: (error) => {
+      alert(error?.response?.data?.message || "Failed to send email reminders")
     },
   })
 
@@ -180,12 +204,23 @@ export default function IndebtedClients() {
       title="Indebted Clients" 
       breadcrumbs={["Home", "Clients", "Indebted"]}
       right={
-        <Chip 
-          icon={<WarningIcon />}
-          label={`${filteredCustomers.length} Overdue Client${filteredCustomers.length !== 1 ? 's' : ''}`} 
-          color="error"
-          variant="outlined"
-        />
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <Button
+            variant="outlined"
+            startIcon={<EmailIcon />}
+            onClick={() => emailAllMutation.mutate(0)}
+            disabled={emailAllMutation.isLoading || filteredCustomers.length === 0}
+            size="small"
+          >
+            {emailAllMutation.isLoading ? "Sending..." : "Email All Reminders"}
+          </Button>
+          <Chip 
+            icon={<WarningIcon />}
+            label={`${filteredCustomers.length} Overdue Client${filteredCustomers.length !== 1 ? 's' : ''}`} 
+            color="error"
+            variant="outlined"
+          />
+        </Box>
       }
     >
       {/* Search Bar */}
@@ -263,6 +298,14 @@ export default function IndebtedClients() {
                         title="Send WhatsApp Reminder"
                       >
                         <WhatsAppIcon />
+                      </IconButton>
+                      <IconButton
+                        color="primary"
+                        onClick={() => emailReminderMutation.mutate(customerData.customer._id)}
+                        title="Send Email Reminder"
+                        disabled={emailReminderMutation.isLoading}
+                      >
+                        <EmailIcon />
                       </IconButton>
                       <Button
                         variant="contained"

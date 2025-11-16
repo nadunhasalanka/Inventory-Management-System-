@@ -27,16 +27,19 @@ import {
   IconButton,
   Divider,
   InputAdornment,
+  Tabs,
+  Tab,
 } from "@mui/material"
 import {
   Warning as WarningIcon,
   ExpandMore as ExpandMoreIcon,
   Payment as PaymentIcon,
   Search as SearchIcon,
-  WhatsApp as WhatsAppIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
   Email as EmailIcon,
+  CreditCard as CreditCardIcon,
+  Schedule as ScheduleIcon,
 } from "@mui/icons-material"
 import { Section } from "../components/common"
 import { fetchOverdueCustomers, payCustomerOrder, payCustomerBalance } from "../services/customersApi"
@@ -49,6 +52,7 @@ export default function IndebtedClients() {
   const [selectedCustomer, setSelectedCustomer] = useState(null)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [paymentAmount, setPaymentAmount] = useState("")
+  const [activeTab, setActiveTab] = useState(0) // 0 = Credit Sales, 1 = Overdue
   const queryClient = useQueryClient()
 
   // Fetch overdue customers
@@ -57,17 +61,44 @@ export default function IndebtedClients() {
     queryFn: fetchOverdueCustomers,
   })
 
-  // Filter customers based on search
+  // Split customers into credit sales (not overdue yet) and overdue using useMemo for performance
+  const { creditSalesCustomers, overdueOnlyCustomers } = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const credit = []
+    const overdue = []
+
+    overdueCustomers.forEach((customerData) => {
+      const oldestDate = new Date(customerData.oldestOverdueDate)
+      const isOverdue = oldestDate < today
+
+      if (isOverdue) {
+        overdue.push(customerData)
+      } else {
+        credit.push(customerData)
+      }
+    })
+
+    return { creditSalesCustomers: credit, overdueOnlyCustomers: overdue }
+  }, [overdueCustomers])
+
+  // Get current tab customers
+  const currentCustomers = useMemo(() => {
+    return activeTab === 0 ? creditSalesCustomers : overdueOnlyCustomers
+  }, [activeTab, creditSalesCustomers, overdueOnlyCustomers])
+
+  // Filter customers based on search (memoized for performance)
   const filteredCustomers = useMemo(() => {
-    if (!searchQuery) return overdueCustomers
+    if (!searchQuery) return currentCustomers
     
     const query = searchQuery.toLowerCase()
-    return overdueCustomers.filter(item => 
+    return currentCustomers.filter(item => 
       item.customer.name?.toLowerCase().includes(query) ||
       item.customer.email?.toLowerCase().includes(query) ||
       item.customer.phone?.toLowerCase().includes(query)
     )
-  }, [overdueCustomers, searchQuery])
+  }, [currentCustomers, searchQuery])
 
   // Payment mutation for specific order
   const orderPaymentMutation = useMutation({
@@ -105,10 +136,10 @@ export default function IndebtedClients() {
   const emailReminderMutation = useMutation({
     mutationFn: (customerId) => api.post(`/notifications/customers/${customerId}/send-reminder`),
     onSuccess: () => {
-      alert("Email reminder is being sent in the background!")
+      alert("✅ Email reminder is being sent in the background!")
     },
     onError: (error) => {
-      alert(error?.response?.data?.message || "Failed to send email reminder")
+      alert("❌ " + (error?.response?.data?.message || "Failed to send email reminder"))
     },
   })
 
@@ -116,12 +147,43 @@ export default function IndebtedClients() {
   const emailAllMutation = useMutation({
     mutationFn: (minDaysOverdue = 0) => api.post(`/notifications/send-all-reminders?minDaysOverdue=${minDaysOverdue}`),
     onSuccess: (response) => {
-      alert(`Sending email reminders to ${response.data.totalCustomers} customers in the background!`)
+      alert(`✅ Sending email reminders to ${response.data.totalCustomers} customers in the background!`)
     },
     onError: (error) => {
-      alert(error?.response?.data?.message || "Failed to send email reminders")
+      alert("❌ " + (error?.response?.data?.message || "Failed to send email reminders"))
     },
   })
+
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue)
+    setSearchQuery("") // Clear search when switching tabs
+    setExpandedCustomer(null) // Collapse all when switching
+  }
+
+  const handleSendEmailReminder = (customerData) => {
+    const confirmed = window.confirm(
+      `Send email reminder to ${customerData.customer.name}?\n\n` +
+      `Email: ${customerData.customer.email}\n` +
+      `Outstanding: $${customerData.totalOutstanding.toFixed(2)}\n` +
+      `Overdue Orders: ${customerData.ordersCount}`
+    )
+    
+    if (confirmed) {
+      emailReminderMutation.mutate(customerData.customer._id)
+    }
+  }
+
+  const handleSendAllEmailReminders = () => {
+    const confirmed = window.confirm(
+      `Send email reminders to ALL ${filteredCustomers.length} customers?\n\n` +
+      `This will send individual emails to each customer with their overdue order details.\n\n` +
+      `Continue?`
+    )
+    
+    if (confirmed) {
+      emailAllMutation.mutate(0)
+    }
+  }
 
   const handleExpandCustomer = (customerId) => {
     setExpandedCustomer(expandedCustomer === customerId ? null : customerId)
@@ -172,25 +234,6 @@ export default function IndebtedClients() {
     }
   }
 
-  const handleSendWhatsAppReminder = (customerData) => {
-    const customer = customerData.customer
-    const message = encodeURIComponent(
-      `Hello ${customer.name},\n\n` +
-      `This is a reminder about your overdue payment.\n\n` +
-      `Total Outstanding: $${customerData.totalOutstanding.toFixed(2)}\n` +
-      `Overdue Orders: ${customerData.ordersCount}\n` +
-      `Days Overdue: ${customerData.daysOverdue} days\n\n` +
-      `Please contact us to arrange payment as soon as possible.\n\n` +
-      `Thank you`
-    )
-    const phone = customer.phone?.replace(/[^0-9]/g, "")
-    if (phone) {
-      window.open(`https://wa.me/${phone}?text=${message}`, "_blank")
-    } else {
-      alert("No phone number available for this customer")
-    }
-  }
-
   const getStatusColor = (daysOverdue) => {
     if (daysOverdue > 30) return 'error'
     if (daysOverdue > 14) return 'warning'
@@ -208,21 +251,42 @@ export default function IndebtedClients() {
           <Button
             variant="outlined"
             startIcon={<EmailIcon />}
-            onClick={() => emailAllMutation.mutate(0)}
+            onClick={handleSendAllEmailReminders}
             disabled={emailAllMutation.isLoading || filteredCustomers.length === 0}
             size="small"
           >
-            {emailAllMutation.isLoading ? "Sending..." : "Email All Reminders"}
+            {emailAllMutation.isLoading ? "Sending..." : "Email All"}
           </Button>
           <Chip 
-            icon={<WarningIcon />}
-            label={`${filteredCustomers.length} Overdue Client${filteredCustomers.length !== 1 ? 's' : ''}`} 
-            color="error"
+            icon={activeTab === 0 ? <CreditCardIcon /> : <ScheduleIcon />}
+            label={`${filteredCustomers.length} ${activeTab === 0 ? 'Credit' : 'Overdue'}`} 
+            color={activeTab === 0 ? "primary" : "error"}
             variant="outlined"
           />
         </Box>
       }
     >
+      {/* Tabs */}
+      <Card className="rounded-2xl shadow-sm mb-4">
+        <Tabs 
+          value={activeTab} 
+          onChange={handleTabChange}
+          variant="fullWidth"
+          sx={{ borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab 
+            icon={<CreditCardIcon />} 
+            iconPosition="start"
+            label={`Credit Sales (${creditSalesCustomers.length})`}
+          />
+          <Tab 
+            icon={<ScheduleIcon />} 
+            iconPosition="start"
+            label={`Overdue (${overdueOnlyCustomers.length})`}
+          />
+        </Tabs>
+      </Card>
+
       {/* Search Bar */}
       <Card className="rounded-2xl shadow-sm mb-4">
         <CardContent>
@@ -243,10 +307,15 @@ export default function IndebtedClients() {
       </Card>
 
       {isLoading ? (
-        <Alert severity="info">Loading overdue customers...</Alert>
+        <Alert severity="info">Loading customers...</Alert>
       ) : filteredCustomers.length === 0 ? (
-        <Alert severity="success" icon={<CheckCircleIcon />}>
-          {searchQuery ? "No customers match your search" : "No overdue customers! All payments are up to date."}
+        <Alert severity={searchQuery ? "info" : "success"} icon={<CheckCircleIcon />}>
+          {searchQuery 
+            ? "No customers match your search" 
+            : activeTab === 0
+              ? "No customers with credit sales!"
+              : "No overdue customers! All payments are up to date."
+          }
         </Alert>
       ) : (
         <Grid container spacing={2}>
@@ -293,15 +362,8 @@ export default function IndebtedClients() {
 
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                       <IconButton
-                        color="success"
-                        onClick={() => handleSendWhatsAppReminder(customerData)}
-                        title="Send WhatsApp Reminder"
-                      >
-                        <WhatsAppIcon />
-                      </IconButton>
-                      <IconButton
                         color="primary"
-                        onClick={() => emailReminderMutation.mutate(customerData.customer._id)}
+                        onClick={() => handleSendEmailReminder(customerData)}
                         title="Send Email Reminder"
                         disabled={emailReminderMutation.isLoading}
                       >

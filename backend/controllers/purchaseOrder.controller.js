@@ -5,6 +5,7 @@ const Product = require('../models/Product.model');
 const InventoryStock = require('../models/Inventory_Stock.model');
 const Transaction =require('../models/Transaction.model');
 const asyncHandler = require('../middleware/asyncHandler');
+const { sendPurchaseOrderEmail } = require('../services/email.service');
 
 // --- HELPER FUNCTION ---
 // We'll use this in create and update to keep products in sync
@@ -53,6 +54,36 @@ exports.createPurchaseOrder = asyncHandler(async (req, res, next) => {
         await session.commitTransaction();
         session.endSession();
 
+        // Send email to supplier (async, non-blocking)
+        // Don't wait for email to complete - just log result
+        if (supplier.contact_info?.email) {
+            sendPurchaseOrderEmail({
+                po_number: po.po_number,
+                supplier: {
+                    name: supplier.name,
+                    email: supplier.contact_info.email,
+                    terms: supplier.terms
+                },
+                order_date: po.order_date,
+                expected_delivery_date: po.expected_delivery_date,
+                line_items: po.line_items,
+                subtotal: po.subtotal,
+                tax_amount: po.tax_amount,
+                total: po.total,
+                notes: po.notes
+            }).then(result => {
+                if (result.success) {
+                    console.log(`✅ PO email sent to ${supplier.name} (${result.email})`);
+                } else {
+                    console.error(`❌ Failed to send PO email to ${supplier.name}:`, result.error);
+                }
+            }).catch(err => {
+                console.error('❌ Email sending error:', err);
+            });
+        } else {
+            console.warn(`⚠️ No email address for supplier: ${supplier.name}`);
+        }
+
         res.status(201).json({ success: true, data: po });
 
     } catch (err) {
@@ -69,7 +100,8 @@ exports.createPurchaseOrder = asyncHandler(async (req, res, next) => {
  */
 exports.getPurchaseOrders = asyncHandler(async (req, res, next) => {
     const pos = await PurchaseOrder.find({})
-        .populate('supplier_id', 'name');
+        .populate('supplier_id', 'name')
+        .populate('line_items.product_id', 'name sku unit_cost');
 
     res.status(200).json({ success: true, count: pos.length, data: pos });
 });
@@ -196,15 +228,60 @@ exports.receivePurchaseOrderStock = asyncHandler(async (req, res, next) => {
                 throw new Error(`Cannot receive ${item.quantity_received} items for ${poLineItem.name}. Only ${quantityRemaining} are remaining.`);
             }
 
-            // Update Stock
-            const stockUpdate = await InventoryStock.findOneAndUpdate(
-                { product_id: item.product_id, location_id: location_id },
-                { 
-                    $inc: { current_quantity: item.quantity_received },
-                    $setOnInsert: { product_id: item.product_id, location_id: location_id }
-                },
-                { upsert: true, new: true, session: session }
-            );
+            // Get current inventory stock (for weighted average calculation)
+            let inventoryStock = await InventoryStock.findOne(
+                { product_id: item.product_id, location_id: location_id }
+            ).session(session);
+
+            // Get current product (for cost calculation)
+            const product = await Product.findById(item.product_id).session(session);
+
+            // Calculate weighted average cost
+            const oldQuantity = inventoryStock ? inventoryStock.current_quantity : 0;
+            const oldCost = product.unit_cost || 0;
+            const newQuantity = item.quantity_received;
+            const newCost = poLineItem.unit_cost;
+
+            const oldValue = oldQuantity * oldCost;
+            const newValue = newQuantity * newCost;
+            const totalValue = oldValue + newValue;
+            const totalQuantity = oldQuantity + newQuantity;
+            const weightedAvgCost = totalQuantity > 0 ? totalValue / totalQuantity : newCost;
+
+            // Generate batch number if not provided
+            const batchNumber = `BATCH-${Date.now()}-${item.product_id.toString().slice(-6)}`;
+
+            // Update Stock - add batch with cost
+            if (!inventoryStock) {
+                inventoryStock = await InventoryStock.create([{
+                    product_id: item.product_id,
+                    location_id: location_id,
+                    current_quantity: newQuantity,
+                    batches: [{
+                        batch_number: batchNumber,
+                        quantity: newQuantity,
+                        unit_cost: newCost,
+                        received_date: new Date(),
+                        grn_id: po._id,
+                        supplier_id: po.supplier_id,
+                        expire_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // Default 1 year
+                    }]
+                }], { session: session });
+                inventoryStock = inventoryStock[0];
+            } else {
+                // Add new batch
+                inventoryStock.batches.push({
+                    batch_number: batchNumber,
+                    quantity: newQuantity,
+                    unit_cost: newCost,
+                    received_date: new Date(),
+                    grn_id: po._id,
+                    supplier_id: po.supplier_id,
+                    expire_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+                });
+                inventoryStock.current_quantity += newQuantity;
+                await inventoryStock.save({ session: session });
+            }
 
             // Create Transaction Log
             await Transaction.create([{ 
@@ -213,17 +290,26 @@ exports.receivePurchaseOrderStock = asyncHandler(async (req, res, next) => {
                 location_id: location_id,
                 quantity_delta: item.quantity_received,
                 cost_at_time_of_tx: poLineItem.unit_cost,
-                balance_after: stockUpdate.current_quantity,
+                balance_after: inventoryStock.current_quantity,
                 user_id: user_id,
                 source_type: 'PurchaseOrder',
                 source_id: po._id
             }], { session: session });
 
-            // Update Product Cost (Last-In Cost)
-            await Product.findByIdAndUpdate(item.product_id, 
-                { unit_cost: poLineItem.unit_cost },
-                { session: session }
-            );
+            // Update Product with weighted average cost and cost history
+            product.cost_history.push({
+                date: new Date(),
+                quantity_received: newQuantity,
+                unit_cost: newCost,
+                total_value: newValue,
+                grn_id: po._id,
+                supplier_id: po.supplier_id,
+                running_avg_cost: weightedAvgCost
+            });
+            product.unit_cost = weightedAvgCost;
+            product.last_purchase_cost = newCost;
+            product.last_purchase_date = new Date();
+            await product.save({ session: session });
         }
 
         // Add the new GRN to the PO

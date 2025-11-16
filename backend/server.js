@@ -14,8 +14,10 @@ const customerRoutes = require('./routes/customer.routes');
 const supplierRoutes = require('./routes/supplier.routes');
 const locationRoutes = require('./routes/inventoryLocation.routes');
 const inventoryRoutes = require('./routes/inventory.routes');
+const stockTransferRoutes = require('./routes/stockTransfer.routes');
 const purchaseOrderRoutes = require('./routes/purchaseOrder.routes');
 const salesOrderRoutes = require('./routes/salesOrder.routes');
+const paymentRoutes = require('./routes/payment.routes');
 // Legacy returnsExchange.routes is replaced by new returns.routes (refund/exchange handling)
 let returnsRoutes;
 try {
@@ -79,14 +81,20 @@ app.use('/api/suppliers', supplierRoutes);
 // Location Routes
 app.use('/api/locations', locationRoutes);
 
-//
+// Inventory Routes
 app.use('/api/inventory', inventoryRoutes);
+
+// Stock Transfer Routes
+app.use('/api/stock-transfers', stockTransferRoutes);
 
 // Purchase Order
 app.use('/api/purchase-orders', purchaseOrderRoutes);
 
 // Get an order (both credit and cash)
 app.use('/api/sales-orders', salesOrderRoutes);
+
+// Payment Routes
+app.use('/api/payments', paymentRoutes);
 
 // Return an item
 app.use('/api/returns', returnsRoutes);

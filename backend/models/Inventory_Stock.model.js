@@ -10,7 +10,24 @@ const BatchLotSchema = new mongoose.Schema({
         type: Number,
         required: [true, 'Quantity for this batch is required'],
         min: [0, 'Batch quantity cannot be negative']
-    }, 
+    },
+    unit_cost: {
+        type: Number,
+        required: [true, 'Unit cost is required for batch'],
+        min: [0, 'Unit cost cannot be negative']
+    },
+    received_date: {
+        type: Date,
+        default: Date.now
+    },
+    grn_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'PurchaseOrder'
+    },
+    supplier_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Supplier'
+    },
     expire_date: {
         type: Date,
         default: Date.now

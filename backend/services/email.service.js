@@ -149,6 +149,94 @@ exports.sendTestEmail = async (recipientEmail) => {
   }
 };
 
+// Send Purchase Order email to supplier
+exports.sendPurchaseOrderEmail = async (poData) => {
+  try {
+    const transporter = createTransporter();
+    const template = await loadTemplate('purchaseOrder');
+
+    // Prepare data for template
+    const emailData = {
+      poNumber: poData.po_number,
+      supplierName: poData.supplier.name,
+      companyName: process.env.COMPANY_NAME || 'Your Company',
+      orderDate: poData.order_date,
+      expectedDeliveryDate: poData.expected_delivery_date || null,
+      paymentTerms: poData.supplier.terms || null,
+      items: poData.line_items.map(item => ({
+        name: item.name || 'Unknown Product',
+        sku: item.sku || 'N/A',
+        quantity: item.quantity_ordered || 0,
+        unitCost: item.unit_cost || 0,
+        total: item.total_cost || 0,
+      })),
+      subtotal: poData.subtotal || 0,
+      taxAmount: poData.tax_amount || 0,
+      total: poData.total || poData.subtotal || 0,
+      notes: poData.notes || null,
+      contactEmail: process.env.CONTACT_EMAIL || process.env.EMAIL_USER,
+      contactPhone: process.env.CONTACT_PHONE || '',
+      currentYear: new Date().getFullYear(),
+    };
+
+    const htmlContent = template(emailData);
+
+    const mailOptions = {
+      from: `"${emailData.companyName} Purchasing" <${process.env.EMAIL_USER}>`,
+      to: poData.supplier.email,
+      subject: `Purchase Order ${poData.po_number} - ${emailData.companyName}`,
+      html: htmlContent,
+      // Plain text fallback
+      text: `
+Dear ${poData.supplier.name},
+
+Purchase Order: ${poData.po_number}
+Order Date: ${new Date(poData.order_date).toLocaleDateString()}
+${poData.expected_delivery_date ? `Expected Delivery: ${new Date(poData.expected_delivery_date).toLocaleDateString()}` : ''}
+
+Items Ordered:
+${poData.line_items.map(item => 
+  `- ${item.name} (SKU: ${item.sku}) - Qty: ${item.quantity_ordered} @ Rs ${(item.unit_cost || 0).toFixed(2)} = Rs ${(item.total_cost || 0).toFixed(2)}`
+).join('\n')}
+
+Subtotal: Rs ${(poData.subtotal || 0).toFixed(2)}
+${poData.tax_amount ? `Tax: Rs ${(poData.tax_amount || 0).toFixed(2)}` : ''}
+Total: Rs ${((poData.total || poData.subtotal) || 0).toFixed(2)}
+
+${poData.notes ? `Notes: ${poData.notes}` : ''}
+
+Please confirm receipt and let us know if you have any questions.
+
+Thank you,
+${emailData.companyName} Purchasing Team
+${emailData.contactEmail}
+      `.trim(),
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    
+    console.log('✅ Purchase Order email sent:', {
+      poNumber: poData.po_number,
+      supplier: poData.supplier.name,
+      email: poData.supplier.email,
+      messageId: info.messageId
+    });
+    
+    return {
+      success: true,
+      messageId: info.messageId,
+      email: poData.supplier.email,
+    };
+  } catch (error) {
+    console.error('❌ Error sending PO email:', error);
+    return {
+      success: false,
+      error: error.message,
+      email: poData.supplier?.email,
+    };
+  }
+};
+
 // Validate email configuration
 exports.validateEmailConfig = () => {
   const requiredEnvVars = ['EMAIL_USER', 'EMAIL_PASSWORD'];

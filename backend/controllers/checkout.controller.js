@@ -126,20 +126,75 @@ exports.processCheckout = asyncHandler(async (req, res, next) => {
             );
         }
 
+        // FIFO batch deduction and COGS tracking
         for (const item of validated_line_items) {
-            const stockItem = await InventoryStock.findOneAndUpdate(
+            const stockItem = await InventoryStock.findOne(
+                { product_id: item.product_id, location_id: location_id }
+            ).session(session);
+
+            if (!stockItem) {
+                throw new Error(`Stock item not found for product ${item.product_id}`);
+            }
+
+            // Sort batches by received_date (FIFO - First In, First Out)
+            const sortedBatches = [...stockItem.batches].sort((a, b) => 
+                new Date(a.received_date) - new Date(b.received_date)
+            );
+
+            let remainingQty = item.quantity;
+            let totalCost = 0;
+            const updatedBatches = [];
+
+            // Deduct from oldest batches first (FIFO)
+            for (const batch of sortedBatches) {
+                if (remainingQty <= 0) {
+                    updatedBatches.push(batch);
+                    continue;
+                }
+
+                if (batch.quantity <= remainingQty) {
+                    // Consume entire batch
+                    totalCost += batch.quantity * batch.unit_cost;
+                    remainingQty -= batch.quantity;
+                    // Don't push this batch (it's fully consumed)
+                } else {
+                    // Partially consume batch
+                    totalCost += remainingQty * batch.unit_cost;
+                    updatedBatches.push({
+                        ...batch.toObject(),
+                        quantity: batch.quantity - remainingQty
+                    });
+                    remainingQty = 0;
+                }
+            }
+
+            if (remainingQty > 0) {
+                throw new Error(`Not enough batch quantity for ${item.name}. Missing ${remainingQty} units.`);
+            }
+
+            // Calculate average COGS for this sale
+            const avgCost = totalCost / item.quantity;
+
+            // Update inventory with new batches and reduced quantity
+            const updatedStockItem = await InventoryStock.findOneAndUpdate(
                 { product_id: item.product_id, location_id: location_id },
-                { $inc: { current_quantity: -item.quantity } },
+                { 
+                    $set: { 
+                        batches: updatedBatches,
+                        current_quantity: stockItem.current_quantity - item.quantity
+                    }
+                },
                 { new: true, session: session }
             );
 
+            // Create transaction log with actual COGS
             await Transaction.create([{
                 type: 'OUT',
                 product_id: item.product_id,
                 location_id: location_id,
                 quantity_delta: -item.quantity,
-                cost_at_time_of_tx: item.unit_price,
-                balance_after: stockItem.current_quantity,
+                cost_at_time_of_tx: avgCost, // Use actual COGS from batches
+                balance_after: updatedStockItem.current_quantity,
                 user_id: user_id,
                 source_type: 'SalesOrder',
                 source_id: so._id

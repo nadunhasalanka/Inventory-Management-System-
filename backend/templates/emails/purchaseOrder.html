@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Purchase Order</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+      border-radius: 10px 10px 0 0;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+    .content {
+      background: #f9f9f9;
+      padding: 30px;
+      border-left: 4px solid #3b82f6;
+      border-right: 4px solid #3b82f6;
+    }
+    .po-details {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .detail-row:last-child {
+      border-bottom: none;
+    }
+    .detail-row .label {
+      color: #666;
+      font-weight: normal;
+    }
+    .detail-row .value {
+      font-weight: bold;
+      color: #333;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .items-table th {
+      background: #3b82f6;
+      color: white;
+      padding: 12px;
+      text-align: left;
+      font-weight: bold;
+    }
+    .items-table td {
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+    }
+    .items-table tr:last-child td {
+      border-bottom: none;
+    }
+    .items-table tr:hover {
+      background: #f5f5f5;
+    }
+    .totals {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      font-size: 16px;
+    }
+    .totals-row.total {
+      border-top: 2px solid #3b82f6;
+      padding-top: 15px;
+      margin-top: 10px;
+      font-size: 20px;
+      font-weight: bold;
+      color: #3b82f6;
+    }
+    .info-box {
+      background: #dbeafe;
+      border-left: 4px solid #3b82f6;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 5px;
+    }
+    .info-box h3 {
+      margin-top: 0;
+      color: #1e40af;
+    }
+    .footer {
+      background: #333;
+      color: #fff;
+      padding: 20px;
+      text-align: center;
+      border-radius: 0 0 10px 10px;
+      font-size: 14px;
+    }
+    .footer a {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+    .contact-info {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+      border-left: 4px solid #3b82f6;
+    }
+    .contact-info h3 {
+      margin-top: 0;
+      color: #3b82f6;
+    }
+    .contact-info a {
+      color: #3b82f6;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📋 Purchase Order</h1>
+    <p style="margin: 10px 0 0 0; font-size: 18px;">{{poNumber}}</p>
+  </div>
+
+  <div class="content">
+    <p>Dear <strong>{{supplierName}}</strong>,</p>
+
+    <p>We would like to place the following purchase order with your company. Please review the details below and confirm receipt of this order.</p>
+
+    <div class="po-details">
+      <h3 style="color: #3b82f6; margin-top: 0;">Order Details</h3>
+      <div class="detail-row">
+        <span class="label">PO Number:</span>
+        <span class="value">{{poNumber}}</span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Order Date:</span>
+        <span class="value">{{formatDate orderDate}}</span>
+      </div>
+      {{#if expectedDeliveryDate}}
+      <div class="detail-row">
+        <span class="label">Expected Delivery:</span>
+        <span class="value">{{formatDate expectedDeliveryDate}}</span>
+      </div>
+      {{/if}}
+      <div class="detail-row">
+        <span class="label">Company:</span>
+        <span class="value">{{companyName}}</span>
+      </div>
+      {{#if paymentTerms}}
+      <div class="detail-row">
+        <span class="label">Payment Terms:</span>
+        <span class="value">{{paymentTerms}}</span>
+      </div>
+      {{/if}}
+    </div>
+
+    <h3 style="color: #3b82f6;">Ordered Items</h3>
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>SKU</th>
+          <th style="text-align: center;">Quantity</th>
+          <th style="text-align: right;">Unit Cost</th>
+          <th style="text-align: right;">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each items}}
+        <tr>
+          <td><strong>{{this.name}}</strong></td>
+          <td>{{this.sku}}</td>
+          <td style="text-align: center;">{{this.quantity}}</td>
+          <td style="text-align: right;">{{currency this.unitCost}}</td>
+          <td style="text-align: right;"><strong>{{currency this.total}}</strong></td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+
+    <div class="totals">
+      <div class="totals-row">
+        <span>Subtotal:</span>
+        <span>{{currency subtotal}}</span>
+      </div>
+      {{#if taxAmount}}
+      <div class="totals-row">
+        <span>Tax (15%):</span>
+        <span>{{currency taxAmount}}</span>
+      </div>
+      {{/if}}
+      <div class="totals-row total">
+        <span>Grand Total:</span>
+        <span>{{currency total}}</span>
+      </div>
+    </div>
+
+    {{#if notes}}
+    <div class="info-box">
+      <h3>📝 Additional Notes</h3>
+      <p style="margin: 0;">{{notes}}</p>
+    </div>
+    {{/if}}
+
+    <div class="contact-info">
+      <h3>📞 Contact Information</h3>
+      <p style="margin: 5px 0;"><strong>{{companyName}}</strong></p>
+      <ul style="list-style: none; padding: 0; margin: 10px 0;">
+        <li>📧 Email: <a href="mailto:{{contactEmail}}">{{contactEmail}}</a></li>
+        {{#if contactPhone}}
+        <li>📞 Phone: {{contactPhone}}</li>
+        {{/if}}
+      </ul>
+      <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">
+        If you have any questions about this order, please don't hesitate to contact us.
+      </p>
+    </div>
+
+    <p>Thank you for your continued partnership and prompt service.</p>
+
+    <p>Best regards,<br>
+    <strong>{{companyName}} Purchasing Team</strong></p>
+  </div>
+
+  <div class="footer">
+    <p>This is an automated purchase order from {{companyName}}</p>
+    <p>© {{currentYear}} {{companyName}}. All rights reserved.</p>
+    <p style="font-size: 12px; color: #999; margin-top: 10px;">
+      Please do not reply directly to this email. For assistance, contact us at <a href="mailto:{{contactEmail}}">{{contactEmail}}</a>
+    </p>
+  </div>
+</body>
+</html>

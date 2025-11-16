@@ -52,6 +52,37 @@ const DigitalAssetSchema = new mongoose.Schema({
     }
 });
 
+const CostHistorySchema = new mongoose.Schema({
+    date: {
+        type: Date,
+        default: Date.now
+    },
+    quantity_received: {
+        type: Number,
+        required: true
+    },
+    unit_cost: {
+        type: Number,
+        required: true
+    },
+    total_value: {
+        type: Number,
+        required: true
+    },
+    grn_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'PurchaseOrder'
+    },
+    supplier_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Supplier'
+    },
+    running_avg_cost: {
+        type: Number,
+        required: true
+    }
+}, { _id: false });
+
 const ProductSchema = new mongoose.Schema({
     sku: {
         type: String,
@@ -103,6 +134,17 @@ const ProductSchema = new mongoose.Schema({
     allow_returns: {
         type: Boolean,
         default: true
+    },
+
+    cost_history: [CostHistorySchema],
+    
+    last_purchase_cost: {
+        type: Number,
+        min: [0, 'Last purchase cost cannot be negative']
+    },
+    
+    last_purchase_date: {
+        type: Date
     },
 
     variants: [VariantSchema],

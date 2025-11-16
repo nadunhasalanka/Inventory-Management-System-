@@ -1,5 +1,6 @@
 const User = require('../models/User.model');
 const jwt = require('jsonwebtoken');
+const formatUser = require('../utils/formatUser');
 
 // Register a new user
 // @route POST /api/auth/register
@@ -43,7 +44,15 @@ exports.login = async (req, res, next) => {
             return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
 
+        // Update last login timestamp
+        user.last_login_at = new Date();
+        await user.save({ validateBeforeSave: false });
+
         const token = user.getSignedJwtToken();
+
+        // Fetch user with populated location
+        const hydratedUser = await User.findById(user._id).populate('active_location_id');
+        const responseUser = formatUser(hydratedUser);
 
         res.cookie('token', token, {
             httpOnly: true, // <-- Cannot be accessed by JavaScript
@@ -55,11 +64,7 @@ exports.login = async (req, res, next) => {
         // 2. Send the user data (without the token)
         res.status(200).json({ 
             success: true, 
-            user: { 
-                id: user._id, 
-                role: user.role, 
-                email: user.email 
-            }
+            user: responseUser
         });
 
         // res.status(200).json({ success: true, token, user: { id: user._id, role: user.role, email: user.email } });
@@ -83,7 +88,7 @@ exports.logout = (req, res, next) => {
 };
 
 exports.getMe = async (req, res, next) => {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.id).populate('active_location_id');
 
     if (!user) {
         return res.status(404).json({ success: false, message: 'User not found' });
@@ -91,13 +96,6 @@ exports.getMe = async (req, res, next) => {
 
     res.status(200).json({
         success: true,
-        user: {
-            id: user._id,
-            role: user.role,
-            email: user.email,
-            username: user.username,
-            first_name: user.first_name,
-            last_name: user.last_name
-        }
+        user: formatUser(user)
     });
 };

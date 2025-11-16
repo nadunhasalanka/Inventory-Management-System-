@@ -16,7 +16,13 @@ const locationRoutes = require('./routes/inventoryLocation.routes');
 const inventoryRoutes = require('./routes/inventory.routes');
 const purchaseOrderRoutes = require('./routes/purchaseOrder.routes');
 const salesOrderRoutes = require('./routes/salesOrder.routes');
-const returnsRoutes = require('./routes/returnsExchange.routes');
+// Legacy returnsExchange.routes is replaced by new returns.routes (refund/exchange handling)
+let returnsRoutes;
+try {
+    returnsRoutes = require('./routes/returns.routes');
+} catch (e) {
+    returnsRoutes = require('./routes/returnsExchange.routes');
+}
 const checkoutRoutes = require('./routes/checkout.routes');
 
 const app = express();

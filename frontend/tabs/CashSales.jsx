@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Section, SearchInput } from "../components/common"
 import {
   Grid,
@@ -20,10 +20,20 @@ import {
   InputLabel,
   Select,
   Chip,
+  Alert,
 } from "@mui/material"
 import { ReceiptLong, QrCode2, Delete, Close } from "@mui/icons-material"
-import { inventoryRows } from "../data/mock"
+// Replaced mock inventoryRows with live products via backend
+// NOTE: Backend checkout currently ignores discount values; it recalculates line item prices using product.selling_price.
+// Discount is therefore only reflected in the fiscalized invoice locally. Extending backend to support discounts would
+// require modifying processCheckout to accept and apply discount logic.
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { fetchProducts } from "../services/productApi"
+import { fetchCustomers } from "../services/customersApi"
+import { fetchLocations } from "../services/inventoryApi"
+import { processCheckout } from "../services/salesApi"
 import { fiscalizeInvoice, generateInvoiceJSON } from "../app/actions/mra"
+import { useCurrentUser } from "../context/CurrentUserContext"
 
 const PAYMENT_METHODS = [
   { value: "cash", label: "Cash", icon: "💵" },
@@ -31,6 +41,8 @@ const PAYMENT_METHODS = [
   { value: "mobile_money", label: "Mobile Money", icon: "📱" },
   { value: "bank_transfer", label: "Bank Transfer", icon: "🏦" },
   { value: "cheque", label: "Cheque", icon: "📝" },
+  { value: "credit", label: "Credit Sale", icon: "🧾" },
+  { value: "split", label: "Split Payment", icon: "🧮" },
 ]
 
 export default function CashSales() {
@@ -39,17 +51,71 @@ export default function CashSales() {
   const [customerName, setCustomerName] = useState("")
   const [discount, setDiscount] = useState({ type: "percentage", value: 0 })
   const [paymentMethod, setPaymentMethod] = useState("cash")
+  const [splitCash, setSplitCash] = useState(0)
+  const [splitCredit, setSplitCredit] = useState(0)
+  const [selectedCustomerId, setSelectedCustomerId] = useState("")
+  const [selectedLocationId, setSelectedLocationId] = useState("")
   const [paymentReference, setPaymentReference] = useState("")
   const [showInvoice, setShowInvoice] = useState(false)
   const [invoiceData, setInvoiceData] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const queryClient = useQueryClient()
+  const { currentUser } = useCurrentUser()
 
-  const pool = useMemo(() => inventoryRows.filter((r) => r.name.toLowerCase().includes(query.toLowerCase())), [query])
+  // Fetch products (cached)
+  const { data: products = [] } = useQuery({
+    queryKey: ["products"],
+    queryFn: () => fetchProducts(),
+  })
+
+  // Fetch customers (public endpoint)
+  const { data: customers = [] } = useQuery({
+    queryKey: ["customers"],
+    queryFn: () => fetchCustomers(),
+  })
+
+  // Fetch locations (protected; assumes user is authenticated)
+  const { data: locations = [] } = useQuery({
+    queryKey: ["locations"],
+    queryFn: fetchLocations,
+  })
+
+  // Default location to user's active location
+  useEffect(() => {
+    if (!locations.length) return
+    const preferred = currentUser?.active_location_id
+    if (preferred && locations.some((loc) => loc._id === preferred)) {
+      setSelectedLocationId((prev) => prev || preferred)
+      return
+    }
+    setSelectedLocationId((prev) => prev || locations[0]?._id || "")
+  }, [locations, currentUser])
+
+  // Always use Walk-in Customer
+  const WALKIN_ID = process.env.NEXT_PUBLIC_WALKIN_CUSTOMER_ID
+  useEffect(() => {
+    if (WALKIN_ID) {
+      setSelectedCustomerId(WALKIN_ID)
+      return
+    }
+    if (customers?.length) {
+      const w = customers.find((c) => /walk[- ]?in/i.test((c.name || `${c.first_name || ""} ${c.last_name || ""}`).trim()))
+      if (w?._id) setSelectedCustomerId(w._id)
+    }
+  }, [WALKIN_ID, customers])
+
+  // Filter product pool by query (name or SKU)
+  const pool = useMemo(() => {
+    const q = query.toLowerCase()
+    return products.filter((p) => (p.name || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q))
+  }, [query, products])
 
   const addToCart = (item) =>
     setCart((prev) => {
       const f = prev.find((p) => p.sku === item.sku)
-      return f ? prev.map((p) => (p.sku === item.sku ? { ...p, qty: p.qty + 1 } : p)) : [...prev, { ...item, qty: 1 }]
+      // Map backend product shape to expected cart item properties
+      const mapped = { ...item, price: item.selling_price ?? item.price ?? 0 }
+      return f ? prev.map((p) => (p.sku === item.sku ? { ...p, qty: p.qty + 1 } : p)) : [...prev, { ...mapped, qty: 1 }]
     })
 
   const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0)
@@ -63,9 +129,55 @@ export default function CashSales() {
 
     setIsProcessing(true)
 
+    // Determine backend payment_type mapping
+    const paymentTypeMap = {
+      cash: "Cash",
+      card: "Cash",
+      mobile_money: "Cash",
+      bank_transfer: "Cash",
+      cheque: "Cash",
+      credit: "Credit",
+      split: "Split",
+    }
+
+    // Use first location as default if none selected
+    const locId = selectedLocationId || (locations[0]?._id || "")
+    const customerId = selectedCustomerId || null // Must be a valid Walk-in id
+    if (!customerId) {
+      alert("Walk-in Customer is not configured. Set NEXT_PUBLIC_WALKIN_CUSTOMER_ID or create a customer named 'Walk-in Customer'.")
+      setIsProcessing(false)
+      return
+    }
+    if (!locId) {
+      alert("Select a location before processing a sale.")
+      setIsProcessing(false)
+      return
+    }
+
+    let salesOrder = null
+    try {
+      salesOrder = await processCheckout({
+        customer_id: customerId,
+        location_id: locId,
+        items: cart,
+        payment: {
+          type: paymentTypeMap[paymentMethod],
+          amount_paid_cash: paymentMethod === "split" ? splitCash : total,
+          amount_to_credit: paymentMethod === "split" ? splitCredit : paymentMethod === "credit" ? total : 0,
+        },
+      })
+      // Invalidate inventory summary to refresh stock globally
+      queryClient.invalidateQueries({ queryKey: ["inventory","summary"] })
+    } catch (e) {
+      alert(e?.response?.data?.message || "Checkout failed")
+      setIsProcessing(false)
+      return
+    }
+
     // Generate invoice JSON
-    const customerData = customerName ? { name: customerName, phone: null, idNumber: null } : null
-    const invoiceJSON = generateInvoiceJSON(cart, customerData, "cash")
+  // Always label as Walk-in in invoice output
+  const customerData = { name: "Walk-in Customer", phone: null, idNumber: null }
+  const invoiceJSON = await generateInvoiceJSON(cart, customerData, paymentTypeMap[paymentMethod].toLowerCase())
 
     invoiceJSON.discount = discountAmount
     invoiceJSON.discountType = discount.type
@@ -86,9 +198,9 @@ export default function CashSales() {
       date: new Date().toISOString(),
     }
 
-    const existingSales = JSON.parse(localStorage.getItem("cash-sales") || "[]")
-    existingSales.push(saleRecord)
-    localStorage.setItem("cash-sales", JSON.stringify(existingSales))
+  const existingSales = JSON.parse(localStorage.getItem("cash-sales") || "[]")
+  existingSales.push({ ...saleRecord, salesOrder })
+  localStorage.setItem("cash-sales", JSON.stringify(existingSales))
 
     setInvoiceData(saleRecord)
     setShowInvoice(true)
@@ -128,7 +240,7 @@ export default function CashSales() {
                     size="small"
                   >
                     <span className="truncate text-left w-full text-xs">{p.name}</span>
-                    <span className="font-semibold">${p.price.toFixed(2)}</span>
+                    <span className="font-semibold">${Number(p.selling_price ?? p.price ?? 0).toFixed(2)}</span>
                   </Button>
                 ))}
               </div>
@@ -194,11 +306,46 @@ export default function CashSales() {
                 Payment Summary
               </Typography>
 
+              {/* Location selection (minimal UI impact) */}
+              <FormControl fullWidth>
+                <InputLabel>Location</InputLabel>
+                <Select
+                  value={selectedLocationId}
+                  label="Location"
+                  onChange={(e) => setSelectedLocationId(e.target.value)}
+                >
+                  {locations.map((l) => (
+                    <MenuItem key={l._id} value={l._id}>
+                      {l.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              {/* Customer selection (forced to Walk-in) */}
+              <FormControl fullWidth>
+                <InputLabel>Customer</InputLabel>
+                <Select
+                  value={selectedCustomerId}
+                  label="Customer"
+                  onChange={(e) => setSelectedCustomerId(e.target.value)}
+                  disabled
+                >
+                  {customers.map((c) => (
+                    <MenuItem key={c._id} value={c._id}>
+                      {c.name || c.first_name + " " + c.last_name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              {/* Fallback manual name entry */}
               <TextField
                 fullWidth
                 label="Customer Name (Optional)"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
+                disabled
                 placeholder="Walk-in Customer"
               />
 
@@ -216,7 +363,7 @@ export default function CashSales() {
                 </Select>
               </FormControl>
 
-              {paymentMethod !== "cash" && (
+              {paymentMethod !== "cash" && paymentMethod !== "split" && paymentMethod !== "credit" && (
                 <TextField
                   fullWidth
                   label="Payment Reference"
@@ -233,6 +380,31 @@ export default function CashSales() {
                   }
                   helperText="Optional reference for tracking"
                 />
+              )}
+
+              {paymentMethod === "split" && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex gap-2 flex-wrap">
+                    <Chip size="small" label="0%" onClick={() => { setSplitCash(0); setSplitCredit(total); }} />
+                    <Chip size="small" label="50%" onClick={() => { const v = Number((total * 0.5).toFixed(2)); setSplitCash(v); setSplitCredit(Number((total - v).toFixed(2))); }} />
+                    <Chip size="small" label="100%" onClick={() => { setSplitCash(total); setSplitCredit(0); }} />
+                  </div>
+                  <TextField
+                    type="number"
+                    label="Amount Paid Now (Cash)"
+                    value={splitCash}
+                    onChange={(e) => {
+                      const v = Math.max(0, Math.min(total, Number(e.target.value) || 0));
+                      setSplitCash(v);
+                      setSplitCredit(Number((total - v).toFixed(2)));
+                    }}
+                    size="small"
+                    helperText={`Credit to book: $${Number(splitCredit).toFixed(2)} (Total: $${total.toFixed(2)})`}
+                  />
+                </div>
+              )}
+              {paymentMethod === "credit" && (
+                <Alert severity="info">Entire amount will be booked to customer credit balance.</Alert>
               )}
 
               <div className="flex gap-2">
@@ -286,10 +458,10 @@ export default function CashSales() {
                   variant="contained"
                   startIcon={<ReceiptLong />}
                   onClick={handleGenerateInvoice}
-                  disabled={cart.length === 0 || isProcessing}
+                  disabled={cart.length === 0 || isProcessing || (paymentMethod === "split" && (Number((splitCash + splitCredit).toFixed(2)) !== Number(total.toFixed(2))))}
                   fullWidth
                 >
-                  {isProcessing ? "Processing..." : "Generate MRA Invoice"}
+                  {isProcessing ? "Processing..." : "Checkout & Fiscalize"}
                 </Button>
                 <Button variant="outlined" startIcon={<QrCode2 />} disabled size="small">
                   Preview Invoice
@@ -392,7 +564,7 @@ export default function CashSales() {
                 <Typography variant="subtitle2" className="font-semibold mb-2">
                   Items
                 </Typography>
-                {invoiceData.items.map((item, i) => (
+                {invoiceData.items?.map((item, i) => (
                   <div key={i} className="flex justify-between text-sm py-1">
                     <span>
                       {item.name} × {item.quantity}

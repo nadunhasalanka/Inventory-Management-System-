@@ -35,6 +35,12 @@ const UserSchema = new mongoose.Schema({
     last_name: { type: String, trim: true },
     is_active: { type: Boolean, default: true },
     last_login_at: { type: Date },
+    active_location_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'InventoryLocation',
+        default: null
+    },
+    active_location_set_at: { type: Date },
 }, { 
     timestamps: true 
 });

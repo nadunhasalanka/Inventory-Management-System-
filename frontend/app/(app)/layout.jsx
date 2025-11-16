@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Box, Toolbar } from "@mui/material"
 import TopBar from "../../components/layout/TopBar"
 import Sidebar from "../../components/layout/Sidebar"
 import { getCurrentUser, logout, hasPermission } from "../../utils/auth"
 import { usePathname, useRouter } from "next/navigation"
 import { tabs as allTabs, tabPermissions } from "../../config/tabs"
+import { CurrentUserContext } from "../../context/CurrentUserContext"
 
 export default function AppLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -15,18 +16,29 @@ export default function AppLayout({ children }) {
   const router = useRouter()
   const pathname = usePathname()
 
-  useEffect(() => {
-    ;(async () => {
+  const refreshCurrentUser = useCallback(async () => {
+    try {
       const user = await getCurrentUser()
       if (!user) {
-        // Not authenticated: send to login
         router.replace('/login')
-        return
+        setCurrentUser(null)
+        setIsAuthenticated(false)
+        return null
       }
       setCurrentUser(user)
       setIsAuthenticated(true)
-    })()
+      return user
+    } catch (error) {
+      setCurrentUser(null)
+      setIsAuthenticated(false)
+      router.replace('/login')
+      return null
+    }
   }, [router])
+
+  useEffect(() => {
+    refreshCurrentUser()
+  }, [refreshCurrentUser])
 
   const handleLogout = async () => {
     await logout()
@@ -61,20 +73,22 @@ export default function AppLayout({ children }) {
   if (!isAuthenticated) return null
 
   return (
-    <Box sx={{ display: "flex" }}>
-      <TopBar onOpenSidebar={() => setMobileOpen(true)} currentUser={currentUser} onLogout={handleLogout} />
-      <Sidebar
-        currentUser={currentUser}
-        tabs={visibleTabs}
-        active={"dashboard"}
-        onSelect={() => {}}
-        mobileOpen={mobileOpen}
-        onClose={() => setMobileOpen(false)}
-      />
-      <Box component="main" sx={{ flexGrow: 1, p: 3, height: "100vh", overflow: "auto" }} className="bg-background">
-        <Toolbar />
-        <div className="max-w-[1400px] mx-auto">{children}</div>
+    <CurrentUserContext.Provider value={{ currentUser, setCurrentUser, refreshCurrentUser }}>
+      <Box sx={{ display: "flex" }}>
+        <TopBar onOpenSidebar={() => setMobileOpen(true)} currentUser={currentUser} onLogout={handleLogout} />
+        <Sidebar
+          currentUser={currentUser}
+          tabs={visibleTabs}
+          active={"dashboard"}
+          onSelect={() => {}}
+          mobileOpen={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+        />
+        <Box component="main" sx={{ flexGrow: 1, p: 3, height: "100vh", overflow: "auto" }} className="bg-background">
+          <Toolbar />
+          <div className="max-w-[1400px] mx-auto">{children}</div>
+        </Box>
       </Box>
-    </Box>
+    </CurrentUserContext.Provider>
   )
 }

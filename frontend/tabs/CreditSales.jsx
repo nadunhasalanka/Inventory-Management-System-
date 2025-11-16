@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Section, SearchInput } from "../components/common"
 import {
   Grid,
@@ -20,10 +20,19 @@ import {
   Chip,
   LinearProgress,
   MenuItem,
+  FormControl,
+  InputLabel,
+  Select,
 } from "@mui/material"
 import { ReceiptLong, QrCode2, Add, Delete, Close, Warning, CheckCircle } from "@mui/icons-material"
-import { customers, inventoryRows } from "../data/mock"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+// Using high-stock inventory (only items with aggregated stock > threshold)
+import { fetchHighStockInventory } from "../services/inventoryApi"
+import { fetchCustomers, createCustomer } from "../services/customersApi"
+import { fetchLocations } from "../services/inventoryApi"
+import { processCheckout } from "../services/salesApi"
 import { fiscalizeInvoice, generateInvoiceJSON } from "../app/actions/mra"
+import { useCurrentUser } from "../context/CurrentUserContext"
 
 export default function CreditSales() {
   const [selectedCustomer, setSelectedCustomer] = useState(null)
@@ -31,7 +40,14 @@ export default function CreditSales() {
   const [newCustomer, setNewCustomer] = useState({ name: "", id: "", phone: "", maxDebt: 500 })
   const [showNewCustomer, setShowNewCustomer] = useState(false)
 
-  const [invoiceDetails, setInvoiceDetails] = useState({ dueDate: "", allowedDelay: 7 })
+  // Initialize due date to 1 month from now
+  const oneMonthFromNow = useMemo(() => {
+    const date = new Date()
+    date.setMonth(date.getMonth() + 1)
+    return date.toISOString().split('T')[0]
+  }, [])
+
+  const [invoiceDetails, setInvoiceDetails] = useState({ dueDate: oneMonthFromNow, allowedDelay: 7 })
   const [discount, setDiscount] = useState({ type: "percentage", value: 0 })
   const [cart, setCart] = useState([])
   const [query, setQuery] = useState("")
@@ -39,69 +55,130 @@ export default function CreditSales() {
   const [showInvoice, setShowInvoice] = useState(false)
   const [invoiceData, setInvoiceData] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [selectedLocationId, setSelectedLocationId] = useState("")
+  const queryClient = useQueryClient()
+  const { currentUser } = useCurrentUser()
 
-  const pool = useMemo(() => inventoryRows.filter((r) => r.name.toLowerCase().includes(query.toLowerCase())), [query])
+  // Fetch products (for selection)
+  const HIGH_STOCK_MIN = 4
+  const { data: highStockItems = [] } = useQuery({
+    queryKey: ["inventory", "high-stock", HIGH_STOCK_MIN],
+    queryFn: () => fetchHighStockInventory(HIGH_STOCK_MIN),
+  })
+
+  // Fetch customers
+  const { data: customers = [], refetch: refetchCustomers } = useQuery({
+    queryKey: ["customers"],
+    queryFn: () => fetchCustomers(),
+  })
+
+  // Fetch locations
+  const { data: locations = [] } = useQuery({
+    queryKey: ["locations"],
+    queryFn: fetchLocations,
+  })
+
+  // Default location to user's active location
+  useEffect(() => {
+    if (!locations.length) return
+    const preferred = currentUser?.active_location_id
+    if (preferred && locations.some((loc) => loc._id === preferred)) {
+      setSelectedLocationId((prev) => prev || preferred)
+      return
+    }
+    setSelectedLocationId((prev) => prev || locations[0]?._id || "")
+  }, [locations, currentUser])
+
+  const pool = useMemo(() => {
+    const q = query.toLowerCase()
+    return highStockItems.filter((r) => (r.name || "").toLowerCase().includes(q) || (r.sku || "").toLowerCase().includes(q))
+  }, [query, highStockItems])
 
   const addToCart = (item) =>
     setCart((prev) => {
       const f = prev.find((p) => p.sku === item.sku)
-      return f ? prev.map((p) => (p.sku === item.sku ? { ...p, qty: p.qty + 1 } : p)) : [...prev, { ...item, qty: 1 }]
+      const mapped = { ...item, price: item.selling_price ?? item.price ?? 0 }
+      return f ? prev.map((p) => (p.sku === item.sku ? { ...p, qty: p.qty + 1 } : p)) : [...prev, { ...mapped, qty: 1 }]
     })
 
   const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0)
   const discountAmount = discount.type === "percentage" ? (subtotal * discount.value) / 100 : discount.value
   const afterDiscount = subtotal - discountAmount
-  const tax = afterDiscount * 0.15
-  const total = afterDiscount + tax
+  // No tax for credit sales; total equals afterDiscount
+  const total = afterDiscount
 
-  const currentDebt = selectedCustomer?.currentDebt || 0
-  const maxDebt = selectedCustomer?.maxDebt || 500
+  const currentDebt = selectedCustomer?.current_balance || 0
+  const maxDebt = selectedCustomer?.credit_limit || 0
   const newDebt = currentDebt + total
   const debtPercentage = (newDebt / maxDebt) * 100
-  const canProceed = newDebt <= maxDebt
+  const canProceed = maxDebt === 0 ? false : newDebt <= maxDebt
 
   const handleInvoiceChange = (e) => {
     const { name, value } = e.target
     setInvoiceDetails((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleAddNewCustomer = () => {
-    if (!newCustomer.name || !newCustomer.phone) return
-
-    const customer = {
-      id: Date.now(),
-      name: newCustomer.name,
-      phone: newCustomer.phone,
-      idNumber: newCustomer.id,
-      currentDebt: 0,
-      maxDebt: Number.parseFloat(newCustomer.maxDebt),
-      dueDate: null,
+  const handleAddNewCustomer = async () => {
+    if (!newCustomer.name) return
+    try {
+      // Backend requires a unique email; synthesize one if not provided
+      const slug = (newCustomer.name || "customer").toLowerCase().replace(/[^a-z0-9]+/g, "-")
+      const email = `${slug}-${Date.now()}@example.com`
+      const payload = {
+        name: newCustomer.name,
+        email,
+        credit_limit: Number.parseFloat(newCustomer.maxDebt) || 0,
+        address: {},
+      }
+      const created = await createCustomer(payload)
+      await refetchCustomers()
+      setSelectedCustomer(created)
+      setShowNewCustomer(false)
+      setNewCustomer({ name: "", id: "", phone: "", maxDebt: 500 })
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to create customer. Ensure you are authorized and email is unique.")
     }
-
-    customers.push(customer)
-    setSelectedCustomer(customer)
-    setShowNewCustomer(false)
-    setNewCustomer({ name: "", id: "", phone: "", maxDebt: 500 })
   }
 
   const handleGenerateInvoice = async () => {
     if (cart.length === 0 || !selectedCustomer || !canProceed) return
+    if (!selectedLocationId) {
+      alert("Select a location before processing a sale.")
+      return
+    }
 
     setIsProcessing(true)
+    let salesOrder = null
+    try {
+      salesOrder = await processCheckout({
+        customer_id: selectedCustomer._id,
+        location_id: selectedLocationId,
+        items: cart,
+        payment: { type: "Credit", amount_paid_cash: 0, amount_to_credit: total },
+        due_date: invoiceDetails.dueDate ? new Date(invoiceDetails.dueDate).toISOString() : undefined,
+        allowed_delay_days: Number(invoiceDetails.allowedDelay) || 0,
+      })
+      // Invalidate inventory to refresh stock levels
+      queryClient.invalidateQueries({ queryKey: ["inventory", "summary"] })
+    } catch (e) {
+      alert(e?.response?.data?.message || "Checkout failed")
+      setIsProcessing(false)
+      return
+    }
 
     const customerData = {
       name: selectedCustomer.name,
-      phone: selectedCustomer.phone,
-      idNumber: selectedCustomer.idNumber,
+      phone: null,
+      idNumber: null,
     }
 
-    const invoiceJSON = generateInvoiceJSON(cart, customerData, "credit")
+  const invoiceJSON = generateInvoiceJSON(cart, customerData, "credit")
     invoiceJSON.discount = discountAmount
     invoiceJSON.discountType = discount.type
     invoiceJSON.discountValue = discount.value
     invoiceJSON.subtotal = subtotal
     invoiceJSON.total = total
-    invoiceJSON.tax = tax
+  // Remove tax persistence; UI still shows tax calculation but we do not store in backend schema
 
     const fiscalResult = await fiscalizeInvoice(invoiceJSON, true)
 
@@ -110,6 +187,7 @@ export default function CreditSales() {
       ...fiscalResult,
       dueDate: invoiceDetails.dueDate,
       allowedDelay: invoiceDetails.allowedDelay,
+      salesOrder,
     })
 
     setShowInvoice(true)
@@ -117,11 +195,7 @@ export default function CreditSales() {
   }
 
   const handleCompleteSale = () => {
-    if (selectedCustomer) {
-      selectedCustomer.currentDebt = newDebt
-      selectedCustomer.dueDate = invoiceDetails.dueDate
-    }
-
+    // Clear local UI state; backend already updated balances
     setCart([])
     setDiscount({ type: "percentage", value: 0 })
     setShowInvoice(false)
@@ -145,39 +219,41 @@ export default function CreditSales() {
                 </Button>
               </div>
 
+              <div className="flex flex-col gap-5">
               <Autocomplete
                 options={customers}
-                getOptionLabel={(option) => `${option.name} - ${option.phone}`}
+                getOptionLabel={(option) => `${option.name} - ${option.email}`}
                 value={selectedCustomer}
                 onChange={(_, newValue) => setSelectedCustomer(newValue)}
                 inputValue={customerSearch}
                 onInputChange={(_, newInputValue) => setCustomerSearch(newInputValue)}
                 renderInput={(params) => (
-                  <TextField {...params} label="Select Customer" placeholder="Search by name or phone" />
+                  <TextField {...params} label="Select Customer" placeholder="Search by name or email" />
                 )}
                 renderOption={(props, option) => (
                   <li {...props}>
                     <div className="flex flex-col">
                       <span className="font-medium">{option.name}</span>
                       <span className="text-xs text-slate-500">
-                        {option.phone} • Debt: ${option.currentDebt.toFixed(2)} / ${option.maxDebt.toFixed(2)}
+                        Debt: ${Number(option.current_balance || 0).toFixed(2)} / ${Number(option.credit_limit || 0).toFixed(2)}
                       </span>
                     </div>
                   </li>
                 )}
               />
 
-              {selectedCustomer && (
-                <Alert
-                  severity={selectedCustomer.currentDebt > selectedCustomer.maxDebt * 0.8 ? "warning" : "info"}
-                  icon={selectedCustomer.currentDebt > selectedCustomer.maxDebt * 0.8 ? <Warning /> : <CheckCircle />}
-                >
-                  Current debt: ${selectedCustomer.currentDebt.toFixed(2)} of ${selectedCustomer.maxDebt.toFixed(2)}{" "}
-                  limit
-                </Alert>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Location selection */}
+              <FormControl fullWidth sx={{ mt: 1 }}>
+                <InputLabel>Location</InputLabel>
+                <Select value={selectedLocationId} label="Location" onChange={(e) => setSelectedLocationId(e.target.value)}>
+                  {locations.map((l) => (
+                    <MenuItem key={l._id} value={l._id}>
+                      {l.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-1">
                 <TextField
                   type="date"
                   label="Due Date"
@@ -185,6 +261,7 @@ export default function CreditSales() {
                   value={invoiceDetails.dueDate}
                   onChange={handleInvoiceChange}
                   InputLabelProps={{ shrink: true }}
+                  fullWidth
                 />
                 <TextField
                   label="Allowed Delay (days)"
@@ -192,8 +269,36 @@ export default function CreditSales() {
                   type="number"
                   value={invoiceDetails.allowedDelay}
                   onChange={handleInvoiceChange}
+                  fullWidth
                 />
               </div>
+
+              {/* Display calculated allowed_until date */}
+              {invoiceDetails.dueDate && invoiceDetails.allowedDelay > 0 && (
+                <Alert severity="info" icon={<CheckCircle />} sx={{ mt: 2 }}>
+                  Final payment deadline (Due Date + Delay): {' '}
+                  <strong>
+                    {(() => {
+                      const allowedUntil = new Date(invoiceDetails.dueDate)
+                      allowedUntil.setDate(allowedUntil.getDate() + Number(invoiceDetails.allowedDelay))
+                      return allowedUntil.toLocaleDateString()
+                    })()}
+                  </strong>
+                </Alert>
+              )}
+              </div>
+
+              {selectedCustomer && (
+                <Alert
+                  severity={currentDebt > maxDebt * 0.8 ? "warning" : "info"}
+                  icon={currentDebt > maxDebt * 0.8 ? <Warning /> : <CheckCircle />}
+                >
+                  Current debt: ${currentDebt.toFixed(2)} of ${maxDebt.toFixed(2)}{" "}
+                  limit
+                </Alert>
+              )}
+
+              {/* Moved Due Date & Allowed Delay inputs into grouped section above with spacing */}
 
               <div className="flex gap-2">
                 <TextField
@@ -237,7 +342,7 @@ export default function CreditSales() {
                     size="small"
                   >
                     <span className="truncate text-left w-full text-xs">{p.name}</span>
-                    <span className="font-semibold">${p.price.toFixed(2)}</span>
+                    <span className="font-semibold">${Number(p.selling_price ?? p.price ?? 0).toFixed(2)}</span>
                   </Button>
                 ))}
               </div>
@@ -346,12 +451,7 @@ export default function CreditSales() {
                     </Alert>
                   )}
 
-                  {selectedCustomer.dueDate && (
-                    <div className="text-sm">
-                      <span className="text-slate-500">Next Due:</span>
-                      <span className="font-medium ml-2">{selectedCustomer.dueDate}</span>
-                    </div>
-                  )}
+                  {/* Display of next due could be added if backend provides it */}
                 </>
               )}
 
@@ -368,10 +468,7 @@ export default function CreditSales() {
                     <span className="font-medium">-${discountAmount.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <span>Tax (15%)</span>
-                  <span className="font-medium">${tax.toFixed(2)}</span>
-                </div>
+                {/* Tax removed per requirements */}
                 <div className="flex justify-between text-base font-semibold">
                   <span>Total</span>
                   <span>${total.toFixed(2)}</span>
@@ -472,7 +569,7 @@ export default function CreditSales() {
                   <Typography variant="caption" color="text.secondary">
                     Customer
                   </Typography>
-                  <Typography variant="body2">{invoiceData.customer.name}</Typography>
+                  <Typography variant="body2">{invoiceData.customer?.name || selectedCustomer?.name || "Customer"}</Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="caption" color="text.secondary">
@@ -511,7 +608,7 @@ export default function CreditSales() {
                 <Typography variant="subtitle2" className="font-semibold mb-2">
                   Items
                 </Typography>
-                {invoiceData.items.map((item, i) => (
+                {invoiceData.items?.map((item, i) => (
                   <div key={i} className="flex justify-between text-sm py-1">
                     <span>
                       {item.name} × {item.quantity}
@@ -534,10 +631,7 @@ export default function CreditSales() {
                     <span>-${invoiceData.discount.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <span>Tax (15%)</span>
-                  <span>${invoiceData.tax.toFixed(2)}</span>
-                </div>
+                {/* Tax removed per requirements */}
                 <div className="flex justify-between text-lg font-semibold">
                   <span>Total</span>
                   <span>${invoiceData.total.toFixed(2)}</span>

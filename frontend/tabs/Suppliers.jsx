@@ -94,9 +94,14 @@ export default function Suppliers() {
     loadSupplierPayments()
   }, [])
 
-  const loadSuppliers = () => {
-    const data = fetchSuppliers()
-    setSuppliers(data)
+  const loadSuppliers = async () => {
+    try {
+      const data = await fetchSuppliers()
+      setSuppliers(data)
+    } catch (e) {
+      console.error("Failed to load suppliers", e)
+      setSuppliers([])
+    }
   }
 
   const loadPurchaseOrders = () => {
@@ -114,47 +119,54 @@ export default function Suppliers() {
     setSupplierPayments(data)
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (editingSupplier) {
-      editSupplier(editingSupplier.id, formData)
-    } else {
-      createSupplier(formData)
+    try {
+      if (editingSupplier) {
+        await editSupplier(editingSupplier._id, formData)
+      } else {
+        await createSupplier(formData)
+      }
+      setOpenDialog(false)
+      setEditingSupplier(null)
+      setFormData({
+        name: "",
+        contactPerson: "",
+        email: "",
+        phone: "",
+        address: "",
+        paymentTerms: "Net 30",
+        notes: "",
+      })
+      loadSuppliers()
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to save supplier")
     }
-
-    setOpenDialog(false)
-    setEditingSupplier(null)
-    setFormData({
-      name: "",
-      contactPerson: "",
-      email: "",
-      phone: "",
-      address: "",
-      paymentTerms: "Net 30",
-      notes: "",
-    })
-    loadSuppliers()
   }
 
   const handleEdit = (supplier) => {
     setEditingSupplier(supplier)
     setFormData({
       name: supplier.name,
-      contactPerson: supplier.contactPerson || "",
-      email: supplier.email || "",
-      phone: supplier.phone || "",
-      address: supplier.address || "",
-      paymentTerms: supplier.paymentTerms || "Net 30",
+      contactPerson: supplier.contact_info?.primary_contact_name || "",
+      email: supplier.contact_info?.email || "",
+      phone: supplier.contact_info?.phone || "",
+      address: supplier.address?.street || "",
+      paymentTerms: supplier.terms || "Net 30",
       notes: supplier.notes || "",
     })
     setOpenDialog(true)
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (confirm("Are you sure you want to delete this supplier?")) {
-      removeSupplier(id)
-      loadSuppliers()
+      try {
+        await removeSupplier(id)
+        loadSuppliers()
+      } catch (err) {
+        alert(err?.response?.data?.message || "Failed to delete supplier")
+      }
     }
   }
 
@@ -174,7 +186,7 @@ export default function Suppliers() {
 
   const handleCreatePO = (supplier) => {
     setPoFormData({
-      supplierId: supplier.id,
+      supplierId: supplier._id,
       supplierName: supplier.name,
       orderDate: new Date().toISOString().split("T")[0],
       expectedDelivery: "",
@@ -409,23 +421,23 @@ export default function Suppliers() {
               </TableHead>
               <TableBody>
                 {suppliers.map((s) => (
-                  <TableRow key={s.id} hover>
+                  <TableRow key={s._id} hover>
                     <TableCell>{s.name}</TableCell>
-                    <TableCell>{s.contactPerson || "-"}</TableCell>
-                    <TableCell>{s.phone || "-"}</TableCell>
-                    <TableCell>{s.email || "-"}</TableCell>
-                    <TableCell>{s.paymentTerms || "Net 30"}</TableCell>
+                    <TableCell>{s.contact_info?.primary_contact_name || "-"}</TableCell>
+                    <TableCell>{s.contact_info?.phone || "-"}</TableCell>
+                    <TableCell>{s.contact_info?.email || "-"}</TableCell>
+                    <TableCell>{s.terms || "N/A"}</TableCell>
                     <TableCell align="center">
                       <div className="flex justify-center gap-2">
                         <Button size="small" variant="outlined" onClick={() => handleCreatePO(s)}>
                           New PO
                         </Button>
-                        {s.phone && (
+                        {s.contact_info?.phone && (
                           <Tooltip title="WhatsApp">
                             <IconButton
                               color="success"
                               size="small"
-                              onClick={() => window.open(`https://wa.me/${s.phone.replace(/\D/g, "")}`, "_blank")}
+                              onClick={() => window.open(`https://wa.me/${s.contact_info.phone.replace(/\D/g, "")}`, "_blank")}
                             >
                               <WhatsApp />
                             </IconButton>
@@ -437,7 +449,7 @@ export default function Suppliers() {
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Delete">
-                          <IconButton size="small" color="error" onClick={() => handleDelete(s.id)}>
+                          <IconButton size="small" color="error" onClick={() => handleDelete(s._id)}>
                             <Delete />
                           </IconButton>
                         </Tooltip>
@@ -690,7 +702,7 @@ export default function Suppliers() {
                       <Select
                         value={grnFormData.supplierId}
                         onChange={(e) => {
-                          const supplier = suppliers.find((s) => s.id === e.target.value)
+                          const supplier = suppliers.find((s) => s._id === e.target.value)
                           setGrnFormData({
                             ...grnFormData,
                             supplierId: e.target.value,
@@ -700,7 +712,7 @@ export default function Suppliers() {
                         disabled={!!grnFormData.poId}
                       >
                         {suppliers.map((s) => (
-                          <MenuItem key={s.id} value={s.id}>
+                          <MenuItem key={s._id} value={s._id}>
                             {s.name}
                           </MenuItem>
                         ))}
@@ -926,7 +938,7 @@ export default function Suppliers() {
                     <Select
                       value={paymentFormData.supplierId}
                       onChange={(e) => {
-                        const supplier = suppliers.find((s) => s.id === e.target.value)
+                        const supplier = suppliers.find((s) => s._id === e.target.value)
                         setPaymentFormData({
                           ...paymentFormData,
                           supplierId: e.target.value,
@@ -936,7 +948,7 @@ export default function Suppliers() {
                       disabled={!!paymentFormData.grnId}
                     >
                       {suppliers.map((s) => (
-                        <MenuItem key={s.id} value={s.id}>
+                        <MenuItem key={s._id} value={s._id}>
                           {s.name}
                         </MenuItem>
                       ))}

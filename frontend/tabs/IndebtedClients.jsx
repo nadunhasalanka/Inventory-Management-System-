@@ -1,375 +1,482 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Section, SearchInput } from "../components/common"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
-  Paper,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  Button,
   Table,
+  TableBody,
+  TableCell,
+  TableContainer,
   TableHead,
   TableRow,
-  TableCell,
-  TableBody,
-  Tooltip,
-  IconButton,
-  Button,
+  Paper,
+  Alert,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Chip,
-  Alert,
-  Card,
-  CardContent,
-  Typography,
+  Grid,
+  Box,
+  Collapse,
+  IconButton,
   Divider,
+  InputAdornment,
 } from "@mui/material"
-import { WhatsApp, History, Warning, CheckCircle } from "@mui/icons-material"
-import { customers, creditSales, payments } from "../data/mock"
+import {
+  Warning as WarningIcon,
+  ExpandMore as ExpandMoreIcon,
+  Payment as PaymentIcon,
+  Search as SearchIcon,
+  WhatsApp as WhatsAppIcon,
+  CheckCircle as CheckCircleIcon,
+  Error as ErrorIcon,
+} from "@mui/icons-material"
+import { Section } from "../components/common"
+import { fetchOverdueCustomers, payCustomerOrder, payCustomerBalance } from "../services/customersApi"
 
 export default function IndebtedClients() {
-  const [query, setQuery] = useState("")
-  const [showPayment, setShowPayment] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
-  const [selectedClient, setSelectedClient] = useState(null)
-  const [payment, setPayment] = useState({ amount: 0, method: "cash", date: new Date().toISOString().split("T")[0] })
+  const [searchQuery, setSearchQuery] = useState("")
+  const [expandedCustomer, setExpandedCustomer] = useState(null)
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
+  const [selectedCustomer, setSelectedCustomer] = useState(null)
+  const [selectedOrder, setSelectedOrder] = useState(null)
+  const [paymentAmount, setPaymentAmount] = useState("")
+  const queryClient = useQueryClient()
 
-  const indebtedClients = useMemo(() => {
-    return customers
-      .filter((c) => c.currentDebt > 0)
-      .filter((c) => c.name.toLowerCase().includes(query.toLowerCase()) || c.phone.includes(query))
-      .map((c) => {
-        const isOverdue = c.dueDate && new Date(c.dueDate) < new Date()
-        const daysOverdue = isOverdue ? Math.floor((new Date() - new Date(c.dueDate)) / (1000 * 60 * 60 * 24)) : 0
-        return { ...c, isOverdue, daysOverdue }
-      })
-      .sort((a, b) => {
-        // Sort by overdue first, then by amount
-        if (a.isOverdue && !b.isOverdue) return -1
-        if (!a.isOverdue && b.isOverdue) return 1
-        return b.currentDebt - a.currentDebt
-      })
-  }, [query])
+  // Fetch overdue customers
+  const { data: overdueCustomers = [], isLoading } = useQuery({
+    queryKey: ["overdue-customers"],
+    queryFn: fetchOverdueCustomers,
+  })
 
-  const handleOpenPayment = (client) => {
-    setSelectedClient(client)
-    setPayment({ amount: client.currentDebt, method: "cash", date: new Date().toISOString().split("T")[0] })
-    setShowPayment(true)
+  // Filter customers based on search
+  const filteredCustomers = useMemo(() => {
+    if (!searchQuery) return overdueCustomers
+    
+    const query = searchQuery.toLowerCase()
+    return overdueCustomers.filter(item => 
+      item.customer.name?.toLowerCase().includes(query) ||
+      item.customer.email?.toLowerCase().includes(query) ||
+      item.customer.phone?.toLowerCase().includes(query)
+    )
+  }, [overdueCustomers, searchQuery])
+
+  // Payment mutation for specific order
+  const orderPaymentMutation = useMutation({
+    mutationFn: ({ customerId, orderId, amount }) => payCustomerOrder(customerId, orderId, amount),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["overdue-customers"] })
+      setShowPaymentDialog(false)
+      setPaymentAmount("")
+      setSelectedOrder(null)
+      setSelectedCustomer(null)
+      alert("Payment recorded successfully!")
+    },
+    onError: (error) => {
+      alert(error?.response?.data?.message || "Payment failed")
+    },
+  })
+
+  // Payment mutation for full customer balance
+  const fullPaymentMutation = useMutation({
+    mutationFn: ({ customerId, amount }) => payCustomerBalance(customerId, amount),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["overdue-customers"] })
+      setShowPaymentDialog(false)
+      setPaymentAmount("")
+      setSelectedOrder(null)
+      setSelectedCustomer(null)
+      alert("Payment recorded successfully!")
+    },
+    onError: (error) => {
+      alert(error?.response?.data?.message || "Payment failed")
+    },
+  })
+
+  const handleExpandCustomer = (customerId) => {
+    setExpandedCustomer(expandedCustomer === customerId ? null : customerId)
   }
 
-  const handleOpenHistory = (client) => {
-    setSelectedClient(client)
-    setShowHistory(true)
+  const handleOpenFullPaymentDialog = (customerData) => {
+    setSelectedCustomer(customerData.customer)
+    setSelectedOrder(null)
+    setPaymentAmount(customerData.totalOutstanding.toFixed(2))
+    setShowPaymentDialog(true)
   }
 
-  const handleRecordPayment = () => {
-    if (!selectedClient || payment.amount <= 0) return
+  const handleOpenOrderPaymentDialog = (customerData, order) => {
+    setSelectedCustomer(customerData.customer)
+    setSelectedOrder(order)
+    setPaymentAmount(order.credit_outstanding.toFixed(2))
+    setShowPaymentDialog(true)
+  }
 
-    // Record payment
-    payments.push({
-      id: Date.now(),
-      customerId: selectedClient.id,
-      amount: Number.parseFloat(payment.amount),
-      date: payment.date,
-      method: payment.method,
-    })
-
-    // Update customer debt
-    const customer = customers.find((c) => c.id === selectedClient.id)
-    if (customer) {
-      customer.currentDebt = Math.max(0, customer.currentDebt - Number.parseFloat(payment.amount))
-      if (customer.currentDebt === 0) {
-        customer.dueDate = null
-      }
+  const handleProcessPayment = () => {
+    const amount = parseFloat(paymentAmount)
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid payment amount")
+      return
     }
 
-    setShowPayment(false)
-    setSelectedClient(null)
-    setPayment({ amount: 0, method: "cash", date: new Date().toISOString().split("T")[0] })
+    if (selectedOrder) {
+      // Pay specific order
+      if (amount > selectedOrder.credit_outstanding) {
+        alert("Payment amount cannot exceed order outstanding balance")
+        return
+      }
+      orderPaymentMutation.mutate({
+        customerId: selectedCustomer._id,
+        orderId: selectedOrder._id,
+        amount
+      })
+    } else {
+      // Pay full balance
+      if (amount > selectedCustomer.current_balance) {
+        alert("Payment amount cannot exceed customer balance")
+        return
+      }
+      fullPaymentMutation.mutate({
+        customerId: selectedCustomer._id,
+        amount
+      })
+    }
   }
 
-  const handleSendWhatsAppReminder = (client) => {
+  const handleSendWhatsAppReminder = (customerData) => {
+    const customer = customerData.customer
     const message = encodeURIComponent(
-      `Hello ${client.name},\n\n` +
-        `This is a friendly reminder about your outstanding balance.\n\n` +
-        `Amount Due: MUR ${client.currentDebt.toFixed(2)}\n` +
-        `Due Date: ${client.dueDate}\n` +
-        `${client.isOverdue ? `Overdue by ${client.daysOverdue} days\n` : ""}\n` +
-        `Please contact us to arrange payment.\n\n` +
-        `Thank you,\nIMS Team`,
+      `Hello ${customer.name},\n\n` +
+      `This is a reminder about your overdue payment.\n\n` +
+      `Total Outstanding: $${customerData.totalOutstanding.toFixed(2)}\n` +
+      `Overdue Orders: ${customerData.ordersCount}\n` +
+      `Days Overdue: ${customerData.daysOverdue} days\n\n` +
+      `Please contact us to arrange payment as soon as possible.\n\n` +
+      `Thank you`
     )
-    window.open(`https://wa.me/${client.phone.replace(/[^0-9]/g, "")}?text=${message}`, "_blank")
+    const phone = customer.phone?.replace(/[^0-9]/g, "")
+    if (phone) {
+      window.open(`https://wa.me/${phone}?text=${message}`, "_blank")
+    } else {
+      alert("No phone number available for this customer")
+    }
   }
 
-  const getClientPayments = (clientId) => {
-    return payments.filter((p) => p.customerId === clientId).sort((a, b) => new Date(b.date) - new Date(a.date))
+  const getStatusColor = (daysOverdue) => {
+    if (daysOverdue > 30) return 'error'
+    if (daysOverdue > 14) return 'warning'
+    return 'info'
   }
 
-  const getClientSales = (clientId) => {
-    return creditSales.filter((s) => s.customerId === clientId).sort((a, b) => new Date(b.date) - new Date(a.date))
-  }
+  const isProcessing = orderPaymentMutation.isLoading || fullPaymentMutation.isLoading
 
   return (
-    <Section
-      title="Indebted Clients"
+    <Section 
+      title="Indebted Clients" 
       breadcrumbs={["Home", "Clients", "Indebted"]}
       right={
-        <div className="flex items-center gap-3">
-          <SearchInput placeholder="Search by name or phone" value={query} onChange={setQuery} />
-          <Chip label={`${indebtedClients.length} clients`} color="warning" />
-        </div>
+        <Chip 
+          icon={<WarningIcon />}
+          label={`${filteredCustomers.length} Overdue Client${filteredCustomers.length !== 1 ? 's' : ''}`} 
+          color="error"
+          variant="outlined"
+        />
       }
     >
-      {indebtedClients.length === 0 && (
-        <Alert severity="success" className="mb-4">
-          No clients with outstanding debt!
+      {/* Search Bar */}
+      <Card className="rounded-2xl shadow-sm mb-4">
+        <CardContent>
+          <TextField
+            fullWidth
+            placeholder="Search by customer name, email, or phone..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </CardContent>
+      </Card>
+
+      {isLoading ? (
+        <Alert severity="info">Loading overdue customers...</Alert>
+      ) : filteredCustomers.length === 0 ? (
+        <Alert severity="success" icon={<CheckCircleIcon />}>
+          {searchQuery ? "No customers match your search" : "No overdue customers! All payments are up to date."}
         </Alert>
-      )}
-
-      <Paper className="rounded-2xl overflow-hidden">
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Client</TableCell>
-              <TableCell>Phone</TableCell>
-              <TableCell>Due Date</TableCell>
-              <TableCell align="right">Amount Owed</TableCell>
-              <TableCell align="center">Status</TableCell>
-              <TableCell align="center">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {indebtedClients.map((client) => (
-              <TableRow key={client.id} hover className={client.isOverdue ? "bg-red-50" : ""}>
-                <TableCell>
-                  <div>
-                    <div className="font-medium">{client.name}</div>
-                    <div className="text-xs text-slate-500">{client.idNumber}</div>
-                  </div>
-                </TableCell>
-                <TableCell>{client.phone}</TableCell>
-                <TableCell>
-                  <div>
-                    <div>{client.dueDate}</div>
-                    {client.isOverdue && (
-                      <div className="text-xs text-red-600 font-medium">{client.daysOverdue} days overdue</div>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell align="right">
-                  <div className="font-semibold text-lg">${client.currentDebt.toFixed(2)}</div>
-                  <div className="text-xs text-slate-500">of ${client.maxDebt.toFixed(2)} limit</div>
-                </TableCell>
-                <TableCell align="center">
-                  {client.isOverdue ? (
-                    <Chip icon={<Warning />} label="Overdue" color="error" size="small" />
-                  ) : (
-                    <Chip icon={<CheckCircle />} label="Pending" color="warning" size="small" />
-                  )}
-                </TableCell>
-                <TableCell align="center">
-                  <div className="flex justify-center gap-1">
-                    <Tooltip title="Send WhatsApp Reminder">
-                      <IconButton color="success" onClick={() => handleSendWhatsAppReminder(client)}>
-                        <WhatsApp />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="View History">
-                      <IconButton onClick={() => handleOpenHistory(client)}>
-                        <History />
-                      </IconButton>
-                    </Tooltip>
-                    <Button size="small" variant="contained" onClick={() => handleOpenPayment(client)}>
-                      Record Payment
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Paper>
-
-      <Dialog open={showPayment} onClose={() => setShowPayment(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Record Payment</DialogTitle>
-        <DialogContent>
-          {selectedClient && (
-            <div className="space-y-4 mt-2">
-              <Alert severity="info">
-                <div className="font-semibold">{selectedClient.name}</div>
-                <div className="text-sm">Current debt: ${selectedClient.currentDebt.toFixed(2)}</div>
-              </Alert>
-
-              <TextField
-                fullWidth
-                type="number"
-                label="Payment Amount"
-                value={payment.amount}
-                onChange={(e) => setPayment((prev) => ({ ...prev, amount: e.target.value }))}
-                inputProps={{ min: 0, max: selectedClient.currentDebt, step: 0.01 }}
-              />
-
-              <FormControl fullWidth>
-                <InputLabel>Payment Method</InputLabel>
-                <Select
-                  value={payment.method}
-                  label="Payment Method"
-                  onChange={(e) => setPayment((prev) => ({ ...prev, method: e.target.value }))}
-                >
-                  <MenuItem value="cash">Cash</MenuItem>
-                  <MenuItem value="bank">Bank Transfer</MenuItem>
-                  <MenuItem value="card">Card</MenuItem>
-                  <MenuItem value="mobile">Mobile Money</MenuItem>
-                </Select>
-              </FormControl>
-
-              <TextField
-                fullWidth
-                type="date"
-                label="Payment Date"
-                value={payment.date}
-                onChange={(e) => setPayment((prev) => ({ ...prev, date: e.target.value }))}
-                InputLabelProps={{ shrink: true }}
-              />
-
-              <div className="p-3 bg-slate-50 rounded-lg">
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Current Debt</span>
-                  <span className="font-medium">${selectedClient.currentDebt.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Payment Amount</span>
-                  <span className="font-medium text-green-600">
-                    -${Number.parseFloat(payment.amount || 0).toFixed(2)}
-                  </span>
-                </div>
-                <Divider className="my-2" />
-                <div className="flex justify-between font-semibold">
-                  <span>Remaining Balance</span>
-                  <span>
-                    ${Math.max(0, selectedClient.currentDebt - Number.parseFloat(payment.amount || 0)).toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowPayment(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleRecordPayment} disabled={payment.amount <= 0}>
-            Record Payment
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={showHistory} onClose={() => setShowHistory(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Client History - {selectedClient?.name}</DialogTitle>
-        <DialogContent>
-          {selectedClient && (
-            <div className="space-y-4 mt-2">
-              <Card className="rounded-xl">
+      ) : (
+        <Grid container spacing={2}>
+          {filteredCustomers.map((customerData) => (
+            <Grid item xs={12} key={customerData.customer._id}>
+              <Card className="rounded-2xl shadow-sm">
                 <CardContent>
-                  <Typography variant="subtitle2" className="font-semibold mb-2">
-                    Client Information
-                  </Typography>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-slate-500">Phone:</span> {selectedClient.phone}
-                    </div>
-                    <div>
-                      <span className="text-slate-500">ID:</span> {selectedClient.idNumber}
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Current Debt:</span>{" "}
-                      <span className="font-semibold">${selectedClient.currentDebt.toFixed(2)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Credit Limit:</span> ${selectedClient.maxDebt.toFixed(2)}
-                    </div>
-                  </div>
+                  {/* Customer Summary Row */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Box sx={{ flex: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                        <Typography variant="h6" className="font-semibold">
+                          {customerData.customer.name}
+                        </Typography>
+                        <Chip
+                          icon={<ErrorIcon />}
+                          label={`${customerData.daysOverdue} days overdue`}
+                          color={getStatusColor(customerData.daysOverdue)}
+                          size="small"
+                        />
+                      </Box>
+                      
+                      <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Typography variant="caption" color="text.secondary">Email</Typography>
+                          <Typography variant="body2">{customerData.customer.email || 'N/A'}</Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Typography variant="caption" color="text.secondary">Phone</Typography>
+                          <Typography variant="body2">{customerData.customer.phone || 'N/A'}</Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Typography variant="caption" color="text.secondary">Total Outstanding</Typography>
+                          <Typography variant="body2" className="font-bold text-red-600">
+                            ${customerData.totalOutstanding.toFixed(2)}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Typography variant="caption" color="text.secondary">Overdue Orders</Typography>
+                          <Typography variant="body2">{customerData.ordersCount}</Typography>
+                        </Grid>
+                      </Grid>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <IconButton
+                        color="success"
+                        onClick={() => handleSendWhatsAppReminder(customerData)}
+                        title="Send WhatsApp Reminder"
+                      >
+                        <WhatsAppIcon />
+                      </IconButton>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<PaymentIcon />}
+                        onClick={() => handleOpenFullPaymentDialog(customerData)}
+                        disabled={isProcessing}
+                        size="small"
+                      >
+                        Pay All
+                      </Button>
+                      <IconButton
+                        onClick={() => handleExpandCustomer(customerData.customer._id)}
+                        sx={{
+                          transform: expandedCustomer === customerData.customer._id ? 'rotate(180deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.3s'
+                        }}
+                      >
+                        <ExpandMoreIcon />
+                      </IconButton>
+                    </Box>
+                  </Box>
+
+                  {/* Expanded Details */}
+                  <Collapse in={expandedCustomer === customerData.customer._id}>
+                    <Divider sx={{ my: 2 }} />
+                    <Typography variant="subtitle2" className="font-semibold mb-2">
+                      Overdue Orders
+                    </Typography>
+                    
+                    <TableContainer component={Paper} variant="outlined">
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell><strong>Order #</strong></TableCell>
+                            <TableCell><strong>Order Date</strong></TableCell>
+                            <TableCell><strong>Due Date</strong></TableCell>
+                            <TableCell><strong>Final Deadline</strong></TableCell>
+                            <TableCell align="right"><strong>Total</strong></TableCell>
+                            <TableCell align="right"><strong>Paid</strong></TableCell>
+                            <TableCell align="right"><strong>Outstanding</strong></TableCell>
+                            <TableCell><strong>Status</strong></TableCell>
+                            <TableCell align="center"><strong>Action</strong></TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {customerData.overdueOrders.map((order) => {
+                            const orderDaysOverdue = Math.floor(
+                              (new Date() - new Date(order.allowed_until || order.due_date)) / (1000 * 60 * 60 * 24)
+                            )
+                            return (
+                              <TableRow key={order._id}>
+                                <TableCell>{order.order_number}</TableCell>
+                                <TableCell>
+                                  {new Date(order.order_date || order.createdAt).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell>
+                                  {order.due_date ? new Date(order.due_date).toLocaleDateString() : 'N/A'}
+                                </TableCell>
+                                <TableCell>
+                                  {order.allowed_until ? (
+                                    <Box>
+                                      <Typography variant="body2">
+                                        {new Date(order.allowed_until).toLocaleDateString()}
+                                      </Typography>
+                                      <Typography variant="caption" color="error">
+                                        {orderDaysOverdue} days ago
+                                      </Typography>
+                                    </Box>
+                                  ) : 'N/A'}
+                                </TableCell>
+                                <TableCell align="right">
+                                  ${(order.subtotal_snapshot || 0).toFixed(2)}
+                                </TableCell>
+                                <TableCell align="right">
+                                  ${(order.amount_paid_cash || 0).toFixed(2)}
+                                </TableCell>
+                                <TableCell align="right">
+                                  <strong className="text-red-600">
+                                    ${(order.credit_outstanding || 0).toFixed(2)}
+                                  </strong>
+                                </TableCell>
+                                <TableCell>
+                                  <Chip
+                                    label={order.payment_status}
+                                    color={order.payment_status === 'Partially Paid' ? 'warning' : 'error'}
+                                    size="small"
+                                  />
+                                </TableCell>
+                                <TableCell align="center">
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={() => handleOpenOrderPaymentDialog(customerData, order)}
+                                    disabled={isProcessing}
+                                  >
+                                    Pay
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+
+                    {/* Customer Credit Info */}
+                    <Box sx={{ mt: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6} sm={3}>
+                          <Typography variant="caption" color="text.secondary">Current Balance</Typography>
+                          <Typography variant="body2" className="font-semibold">
+                            ${(customerData.customer.current_balance || 0).toFixed(2)}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                          <Typography variant="caption" color="text.secondary">Credit Limit</Typography>
+                          <Typography variant="body2">
+                            ${(customerData.customer.credit_limit || 0).toFixed(2)}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                          <Typography variant="caption" color="text.secondary">Available Credit</Typography>
+                          <Typography variant="body2" color={
+                            (customerData.customer.credit_limit - customerData.customer.current_balance) > 0 
+                              ? 'success.main' 
+                              : 'error.main'
+                          }>
+                            ${Math.max(0, (customerData.customer.credit_limit || 0) - (customerData.customer.current_balance || 0)).toFixed(2)}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                          <Typography variant="caption" color="text.secondary">Oldest Overdue</Typography>
+                          <Typography variant="body2">
+                            {new Date(customerData.oldestOverdueDate).toLocaleDateString()}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Box>
+                  </Collapse>
                 </CardContent>
               </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
 
-              <div>
-                <Typography variant="subtitle2" className="font-semibold mb-2">
-                  Credit Sales
+      {/* Payment Dialog */}
+      <Dialog open={showPaymentDialog} onClose={() => setShowPaymentDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Record Payment</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            <Alert severity="info" sx={{ mb: 3 }}>
+              <Typography variant="body2">
+                <strong>Customer:</strong> {selectedCustomer?.name}
+              </Typography>
+              {selectedOrder ? (
+                <>
+                  <Typography variant="body2">
+                    <strong>Order:</strong> {selectedOrder.order_number}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Order Outstanding:</strong> ${(selectedOrder.credit_outstanding || 0).toFixed(2)}
+                  </Typography>
+                </>
+              ) : (
+                <Typography variant="body2">
+                  <strong>Total Outstanding Balance:</strong> ${(selectedCustomer?.current_balance || 0).toFixed(2)}
                 </Typography>
-                <Paper className="rounded-xl overflow-hidden">
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Invoice</TableCell>
-                        <TableCell>Date</TableCell>
-                        <TableCell align="right">Amount</TableCell>
-                        <TableCell>Status</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {getClientSales(selectedClient.id).map((sale) => (
-                        <TableRow key={sale.id}>
-                          <TableCell className="font-mono text-sm">{sale.invoiceNumber}</TableCell>
-                          <TableCell>{sale.date}</TableCell>
-                          <TableCell align="right">${sale.amount.toFixed(2)}</TableCell>
-                          <TableCell>
-                            <Chip
-                              label={sale.status}
-                              color={sale.status === "overdue" ? "error" : "warning"}
-                              size="small"
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Paper>
-              </div>
+              )}
+            </Alert>
 
-              <div>
-                <Typography variant="subtitle2" className="font-semibold mb-2">
-                  Payment History
-                </Typography>
-                <Paper className="rounded-xl overflow-hidden">
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Date</TableCell>
-                        <TableCell>Method</TableCell>
-                        <TableCell align="right">Amount</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {getClientPayments(selectedClient.id).length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={3} align="center" className="text-slate-500">
-                            No payments recorded yet
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        getClientPayments(selectedClient.id).map((pmt) => (
-                          <TableRow key={pmt.id}>
-                            <TableCell>{pmt.date}</TableCell>
-                            <TableCell>
-                              <Chip label={pmt.method} size="small" variant="outlined" />
-                            </TableCell>
-                            <TableCell align="right" className="font-semibold text-green-600">
-                              ${pmt.amount.toFixed(2)}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </Paper>
-              </div>
-            </div>
-          )}
+            <TextField
+              label="Payment Amount"
+              type="number"
+              fullWidth
+              value={paymentAmount}
+              onChange={(e) => setPaymentAmount(e.target.value)}
+              InputProps={{
+                startAdornment: <Typography sx={{ mr: 1 }}>$</Typography>,
+              }}
+              inputProps={{
+                min: 0,
+                max: selectedOrder ? selectedOrder.credit_outstanding : selectedCustomer?.current_balance,
+                step: 0.01
+              }}
+            />
+
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+              {selectedOrder ? (
+                <>Remaining order balance: ${Math.max(0, (selectedOrder.credit_outstanding || 0) - parseFloat(paymentAmount || 0)).toFixed(2)}</>
+              ) : (
+                <>Remaining customer balance: ${Math.max(0, (selectedCustomer?.current_balance || 0) - parseFloat(paymentAmount || 0)).toFixed(2)}</>
+              )}
+            </Typography>
+
+            {!selectedOrder && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                Payment will be distributed across all outstanding orders, oldest first
+              </Alert>
+            )}
+          </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowHistory(false)}>Close</Button>
+          <Button onClick={() => setShowPaymentDialog(false)} disabled={isProcessing}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleProcessPayment}
+            variant="contained"
+            disabled={isProcessing || !paymentAmount || parseFloat(paymentAmount) <= 0}
+          >
+            {isProcessing ? "Processing..." : "Process Payment"}
+          </Button>
         </DialogActions>
       </Dialog>
     </Section>

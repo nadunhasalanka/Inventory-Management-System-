@@ -11,7 +11,8 @@ exports.processCheckout = asyncHandler(async (req, res, next) => {
     
     const {
         customer_id, location_id, line_items,
-        payment_type, amount_paid_cash, amount_to_credit
+        payment_type, amount_paid_cash, amount_to_credit,
+        due_date, allowed_delay_days
     } = req.body;
     const user_id = req.user.id;
 
@@ -52,23 +53,29 @@ exports.processCheckout = asyncHandler(async (req, res, next) => {
             calculated_grand_total += correct_total_price;
         }
 
-        let payment_status = 'Paid';
-        let customerBalanceUpdate = 0;
+    let payment_status = 'Paid';
+    let customerBalanceUpdate = 0; // How much to move to customer.current_balance
+    let credit_total = 0; // Original credited principal
+    let amountCash = 0;
+    let amountCredit = 0;
 
         if (payment_type === 'Credit') {
             payment_status = 'Pending Credit';
             customerBalanceUpdate = calculated_grand_total;
+            credit_total = calculated_grand_total;
+            amountCredit = calculated_grand_total;
         } else if (payment_type === 'Split') {
             payment_status = 'Partially Paid';
-            
             const totalPayment = (amount_paid_cash || 0) + (amount_to_credit || 0);
-            
             if (totalPayment !== calculated_grand_total) {
-                throw new Error(
-                    `Payment split total (${totalPayment}) does not match the cart total (${calculated_grand_total}).`
-                );
+                throw new Error(`Payment split total (${totalPayment}) does not match the cart total (${calculated_grand_total}).`);
             }
             customerBalanceUpdate = amount_to_credit;
+            credit_total = amount_to_credit || 0;
+            amountCash = amount_paid_cash || 0;
+            amountCredit = amount_to_credit || 0;
+        } else { // Cash
+            amountCash = calculated_grand_total;
         }
         
         if (customerBalanceUpdate > 0) {
@@ -86,13 +93,29 @@ exports.processCheckout = asyncHandler(async (req, res, next) => {
             }
         }
 
+        // Calculate allowed_until from due_date + allowed_delay_days
+        let allowed_until = null;
+        if ((payment_type === 'Credit' || payment_type === 'Split') && due_date && allowed_delay_days > 0) {
+            const dueDate = new Date(due_date);
+            allowed_until = new Date(dueDate.getTime() + (allowed_delay_days * 24 * 60 * 60 * 1000));
+        }
+
         const so = (await SalesOrder.create([{
             order_number: `POS-${Date.now()}`,
             customer_id: customer_id,
             payment_status: payment_status,
+            payment_type: payment_type,
             line_items: validated_line_items,
-            grand_total: calculated_grand_total,
-            status: 'Fulfilled'
+            status: 'Fulfilled',
+            // Credit tracking & snapshot fields
+            due_date: payment_type === 'Credit' || payment_type === 'Split' ? (due_date || null) : null,
+            allowed_until: allowed_until,
+            credit_total: credit_total,
+            credit_outstanding: credit_total, // At creation outstanding equals total credited
+            amount_paid_cash: amountCash,
+            amount_to_credit: amountCredit,
+            subtotal_snapshot: calculated_grand_total, // No discount/tax logic yet
+            discount_total: 0
         }], { session: session }))[0];
 
         if (customerBalanceUpdate > 0) {

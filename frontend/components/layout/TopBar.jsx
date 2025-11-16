@@ -1,10 +1,14 @@
 "use client"
 
 import React from "react"
-import { AppBar, Toolbar, Typography, IconButton, Avatar, Button } from "@mui/material"
-import { Menu as MenuIcon } from "@mui/icons-material"
+import { AppBar, Toolbar, Typography, IconButton, Avatar, Button, Chip } from "@mui/material"
+import { Menu as MenuIcon, LocationOnOutlined } from "@mui/icons-material"
+import Link from "next/link"
 
 export default function TopBar({ onOpenSidebar, currentUser, onLogout }) {
+  const hasLocation = Boolean(currentUser?.active_location?.name)
+  const locationLabel = hasLocation ? currentUser.active_location.name : "No location set"
+
   return (
     <AppBar
       position="fixed"
@@ -33,6 +37,24 @@ export default function TopBar({ onOpenSidebar, currentUser, onLogout }) {
             <div className="text-sm font-medium text-primary-foreground">{currentUser?.name}</div>
             <div className="text-xs text-primary-foreground/80">{currentUser?.role}</div>
           </div>
+          <Chip
+            icon={<LocationOnOutlined fontSize="small" />}
+            label={locationLabel}
+            clickable
+            component={Link}
+            href="/profile"
+            color={hasLocation ? "default" : "warning"}
+            variant={hasLocation ? "outlined" : "filled"}
+            size="small"
+            className="bg-white/10 text-primary-foreground cursor-pointer"
+            sx={{
+              color: hasLocation ? "inherit" : undefined,
+              '& .MuiChip-icon': { color: hasLocation ? 'inherit' : undefined },
+              '&:hover': {
+                backgroundColor: hasLocation ? 'rgba(255,255,255,0.2)' : undefined,
+              },
+            }}
+          />
           <Avatar className="bg-accent text-accent-foreground">{currentUser?.name?.charAt(0) || "U"}</Avatar>
           <Button
             variant="outlined"

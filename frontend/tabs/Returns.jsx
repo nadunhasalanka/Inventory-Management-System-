@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Section, SearchInput } from "../components/common"
 import {
   Grid,
@@ -23,92 +23,120 @@ import {
   Chip,
   MenuItem,
   Alert,
+  FormControl,
+  InputLabel,
+  Select,
 } from "@mui/material"
 import { AssignmentReturn, Delete, Close, Visibility, Receipt } from "@mui/icons-material"
-import { inventoryRows, customers } from "../data/mock"
-import { readData, writeData } from "../utils/db"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { fetchCustomers } from "../services/customersApi"
+import { fetchReturns, createReturn } from "../services/returnsApi"
+import { fetchSalesOrders, fetchRefundableItems } from "../services/salesOrdersApi"
+import { fetchLocations } from "../services/inventoryApi"
+import { useCurrentUser } from "../context/CurrentUserContext"
 
 export default function Returns() {
   const [returnType, setReturnType] = useState("cash")
   const [selectedCustomer, setSelectedCustomer] = useState(null)
   const [invoiceNumber, setInvoiceNumber] = useState("")
-  const [returnItems, setReturnItems] = useState([])
+  // Derived items replaced by memo later; remove obsolete state
   const [returnReason, setReturnReason] = useState("")
   const [refundMethod, setRefundMethod] = useState("cash")
+  const [restockLocationId, setRestockLocationId] = useState("")
   const [showPreview, setShowPreview] = useState(false)
-  const [returns, setReturns] = useState(() => readData("returns") || [])
+  const queryClient = useQueryClient()
+  const { currentUser } = useCurrentUser()
+
+  // Data fetching
+  const { data: customers = [] } = useQuery({ queryKey: ["customers"], queryFn: () => fetchCustomers() })
+  const { data: returns = [] } = useQuery({ queryKey: ["returns"], queryFn: fetchReturns })
+  const { data: salesOrders = [] } = useQuery({ queryKey: ["sales-orders"], queryFn: () => fetchSalesOrders() })
+  const { data: locations = [] } = useQuery({ queryKey: ["locations"], queryFn: fetchLocations })
+
+  // Derive matched sales order id from entered invoice/order number
+  const matchedOrder = useMemo(() => salesOrders.find(o => o.order_number === invoiceNumber), [salesOrders, invoiceNumber])
+  const matchedOrderId = matchedOrder?._id
+
+  // Fetch refundable items only when we have a matched order id
+  const { data: refundableItems = [], isFetching: fetchingRefundable } = useQuery({
+    queryKey: ["sales-order", "refundable", matchedOrderId],
+    queryFn: () => fetchRefundableItems(matchedOrderId),
+    enabled: !!matchedOrderId,
+  })
   const [viewReturn, setViewReturn] = useState(null)
   const [query, setQuery] = useState("")
 
-  const pool = useMemo(() => inventoryRows.filter((r) => r.name.toLowerCase().includes(query.toLowerCase())), [query])
+  // Default restock location to user's active location
+  useEffect(() => {
+    if (!locations.length) return
+    const preferred = currentUser?.active_location_id
+    if (preferred && locations.some((loc) => loc._id === preferred)) {
+      setRestockLocationId((prev) => prev || preferred)
+      return
+    }
+    setRestockLocationId((prev) => prev || locations[0]?._id || "")
+  }, [locations, currentUser])
 
-  const addReturnItem = (item) => {
-    setReturnItems((prev) => {
-      const existing = prev.find((p) => p.sku === item.sku)
-      return existing
-        ? prev.map((p) => (p.sku === item.sku ? { ...p, qty: p.qty + 1 } : p))
-        : [...prev, { ...item, qty: 1, returnQty: 1 }]
-    })
+  // Map selected return quantities by product_id
+  const [returnQuantities, setReturnQuantities] = useState({})
+  const updateReturnQty = (productId, maxAvailable, raw) => {
+    const val = Math.min(maxAvailable, Math.max(0, Number(raw) || 0))
+    setReturnQuantities(prev => ({ ...prev, [productId]: val }))
   }
+  // Build returnItems from refundableItems + chosen quantities
+  const returnItems = useMemo(() => {
+    return refundableItems
+      .filter(it => (returnQuantities[it.product_id] || 0) > 0)
+      .map(it => ({
+        product_id: it.product_id,
+        name: it.name,
+        sku: it.sku,
+        price: it.unit_price,
+        returnQty: returnQuantities[it.product_id]
+      }))
+  }, [refundableItems, returnQuantities])
 
-  const updateReturnQty = (sku, qty) => {
-    setReturnItems((prev) => prev.map((item) => (item.sku === sku ? { ...item, returnQty: qty } : item)))
-  }
-
-  const removeReturnItem = (sku) => {
-    setReturnItems((prev) => prev.filter((item) => item.sku !== sku))
-  }
+  // Legacy add/remove functions removed; selection handled by quantity inputs
 
   const subtotal = returnItems.reduce((s, item) => s + item.price * item.returnQty, 0)
   const tax = subtotal * 0.15
   const total = subtotal + tax
 
+  const createReturnMutation = useMutation({
+    mutationFn: (payload) => createReturn(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["returns"] })
+      queryClient.invalidateQueries({ queryKey: ["sales-orders"] })
+      setShowPreview(false)
+      setInvoiceNumber("")
+      setReturnReason("")
+      setSelectedCustomer(null)
+      setReturnQuantities({})
+    },
+    onError: (e) => {
+      console.error('Return mutation error:', e);
+      console.error('Error response:', e?.response);
+      console.error('Error data:', e?.response?.data);
+      const errorMsg = e?.response?.data?.message || e?.message || "Return failed";
+      alert(errorMsg);
+    }
+  })
+
   const handleProcessReturn = () => {
-    if (returnItems.length === 0) return
-
-    const newReturn = {
-      id: Date.now().toString(),
-      returnNumber: `RET-${Date.now()}`,
-      type: returnType,
-      customer: returnType === "credit" ? selectedCustomer : { name: "Walk-in Customer" },
-      originalInvoice: invoiceNumber || "N/A",
-      items: returnItems.map((item) => ({
-        sku: item.sku,
-        name: item.name,
-        quantity: item.returnQty,
-        price: item.price,
-        total: item.price * item.returnQty,
-      })),
-      subtotal,
-      tax,
-      total,
-      reason: returnReason,
-      refundMethod,
-      status: "processed",
-      createdAt: new Date().toISOString(),
+    if (!matchedOrderId) {
+      alert('Enter a valid invoice/order number first')
+      return
     }
-
-    const updated = [...returns, newReturn]
-    setReturns(updated)
-    writeData("returns", updated)
-
-    // Update inventory (add items back to stock)
-    returnItems.forEach((item) => {
-      // In a real system, this would update the actual inventory
-      console.log(`[v0] Restocking ${item.returnQty} units of ${item.name}`)
+    if (returnItems.length === 0) {
+      alert('Select at least one item quantity to return')
+      return
+    }
+    const itemsPayload = returnItems.map(i => ({ product_id: i.product_id, quantity: i.returnQty, reason: returnReason }))
+    createReturnMutation.mutate({ 
+      sales_order_id: matchedOrderId, 
+      items: itemsPayload,
+      restock_location_id: restockLocationId || null
     })
-
-    // If credit return, reduce customer debt
-    if (returnType === "credit" && selectedCustomer) {
-      selectedCustomer.currentDebt = Math.max(0, selectedCustomer.currentDebt - total)
-      console.log(`[v0] Reduced customer debt by $${total.toFixed(2)}`)
-    }
-
-    setShowPreview(false)
-    setReturnItems([])
-    setInvoiceNumber("")
-    setReturnReason("")
-    setSelectedCustomer(null)
   }
 
   const handleGenerateCreditNote = (returnData) => {
@@ -159,8 +187,8 @@ export default function Returns() {
                 >
                   <MenuItem value="">Select Customer</MenuItem>
                   {customers.map((c) => (
-                    <MenuItem key={c.id} value={c.id}>
-                      {c.name} - {c.phone}
+                    <MenuItem key={c._id} value={c._id}>
+                      {c.name}
                     </MenuItem>
                   ))}
                 </TextField>
@@ -189,64 +217,69 @@ export default function Returns() {
                 placeholder="Defective, wrong item, customer changed mind..."
               />
 
+              <FormControl fullWidth>
+                <InputLabel>Restock Location</InputLabel>
+                <Select
+                  value={restockLocationId}
+                  label="Restock Location"
+                  onChange={(e) => setRestockLocationId(e.target.value)}
+                >
+                  {locations.map((loc) => (
+                    <MenuItem key={loc._id} value={loc._id}>
+                      {loc.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
               <Divider />
 
               <div className="flex items-center justify-between">
                 <Typography variant="subtitle1" className="font-semibold">
-                  Select Items to Return
+                  Refundable Items
                 </Typography>
-                <SearchInput placeholder="Search products" value={query} onChange={setQuery} />
               </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-[250px] overflow-y-auto p-2">
-                {pool.slice(0, 16).map((p) => (
-                  <Button
-                    key={p.sku}
-                    variant="outlined"
-                    onClick={() => addReturnItem(p)}
-                    className="justify-between flex-col items-start h-auto py-2"
-                    size="small"
-                  >
-                    <span className="truncate text-left w-full text-xs">{p.name}</span>
-                    <span className="font-semibold">${p.price.toFixed(2)}</span>
-                  </Button>
-                ))}
-              </div>
+              {!matchedOrderId && (
+                <Alert severity="info">Enter a valid invoice number to load refundable items.</Alert>
+              )}
+              {matchedOrderId && fetchingRefundable && <Alert severity="info">Loading items...</Alert>}
+              {matchedOrderId && !fetchingRefundable && refundableItems.length === 0 && (
+                <Alert severity="warning">No refundable items remaining for this order.</Alert>
+              )}
+              {matchedOrderId && refundableItems.length > 0 && (
+                <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                  {refundableItems.map(it => (
+                    <div key={it.product_id} className="flex items-center justify-between gap-3 p-2 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium text-sm">{it.name}</div>
+                        <div className="text-xs text-slate-500">
+                          Ordered: {it.quantity_ordered} • Available: {it.quantity_available_to_return} • Unit: ${it.unit_price.toFixed(2)}
+                        </div>
+                      </div>
+                      <TextField
+                        type="number"
+                        size="small"
+                        label="Qty"
+                        value={returnQuantities[it.product_id] || ''}
+                        onChange={(e) => updateReturnQty(it.product_id, it.quantity_available_to_return, e.target.value)}
+                        inputProps={{ min: 0, max: it.quantity_available_to_return, style: { width: 70 } }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <Divider />
 
               <div className="space-y-2">
                 <Typography variant="subtitle2" className="font-semibold">
-                  Return Items
+                  Selected Return Items
                 </Typography>
-                {returnItems.length === 0 && (
-                  <Typography color="text.secondary" className="text-sm">
-                    No items added yet
-                  </Typography>
-                )}
-                {returnItems.map((item) => (
-                  <div key={item.sku} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-red-50">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium text-sm">{item.name}</div>
-                      <div className="text-xs text-slate-500">
-                        ${item.price.toFixed(2)} × {item.returnQty} = ${(item.price * item.returnQty).toFixed(2)}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <IconButton
-                        size="small"
-                        onClick={() => updateReturnQty(item.sku, Math.max(1, item.returnQty - 1))}
-                      >
-                        -
-                      </IconButton>
-                      <span className="text-sm font-medium w-6 text-center">{item.returnQty}</span>
-                      <IconButton size="small" onClick={() => updateReturnQty(item.sku, item.returnQty + 1)}>
-                        +
-                      </IconButton>
-                      <IconButton size="small" color="error" onClick={() => removeReturnItem(item.sku)}>
-                        <Delete fontSize="small" />
-                      </IconButton>
-                    </div>
+                {returnItems.length === 0 && <Typography className="text-sm text-slate-500">No quantities chosen</Typography>}
+                {returnItems.map(item => (
+                  <div key={item.product_id} className="flex justify-between text-xs bg-red-50 px-2 py-1 rounded">
+                    <span className="truncate">{item.name} × {item.returnQty}</span>
+                    <span className="font-medium">${(item.price * item.returnQty).toFixed(2)}</span>
                   </div>
                 ))}
               </div>
@@ -280,7 +313,7 @@ export default function Returns() {
                           <Chip label={r.type} size="small" color={r.type === "credit" ? "warning" : "default"} />
                         </TableCell>
                         <TableCell>{new Date(r.createdAt).toLocaleDateString()}</TableCell>
-                        <TableCell className="font-semibold text-red-600">${r.total.toFixed(2)}</TableCell>
+                        <TableCell className="font-semibold text-red-600">${(r.refund_amount ?? r.total ?? 0).toFixed(2)}</TableCell>
                         <TableCell>
                           <Chip label={r.status} size="small" color="success" />
                         </TableCell>
@@ -360,11 +393,11 @@ export default function Returns() {
                 variant="contained"
                 startIcon={<AssignmentReturn />}
                 onClick={() => setShowPreview(true)}
-                disabled={returnItems.length === 0}
+                disabled={!matchedOrderId || returnItems.length === 0 || createReturnMutation.isLoading}
                 fullWidth
                 color="error"
               >
-                Process Return
+                {createReturnMutation.isLoading ? 'Processing...' : 'Process Return'}
               </Button>
             </CardContent>
           </Card>
@@ -471,8 +504,8 @@ export default function Returns() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowPreview(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleProcessReturn} color="error">
-            Confirm & Process Refund
+          <Button variant="contained" onClick={handleProcessReturn} color="error" disabled={createReturnMutation.isLoading}>
+            {createReturnMutation.isLoading ? 'Submitting...' : 'Confirm & Process Refund'}
           </Button>
         </DialogActions>
       </Dialog>

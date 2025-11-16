@@ -15,6 +15,8 @@ import {
   RequestQuote as QuoteIcon,
   AssignmentReturn as ReturnIcon,
   People as PeopleIcon,
+  AccountCircle as AccountCircleIcon,
+  Payment as PaymentIcon,
 } from "@mui/icons-material"
 
 export const tabs = [
@@ -24,14 +26,17 @@ export const tabs = [
   { key: "quotations", label: "Quotations", icon: <QuoteIcon />, path: "/quotations" },
   { key: "cashsales", label: "Cash Sales", icon: <POSIcon />, path: "/cashsales" },
   { key: "creditsales", label: "Credit Sales", icon: <ReceiptIcon />, path: "/creditsales" },
+  { key: "creditpayments", label: "Credit Payments", icon: <PaymentIcon />, path: "/creditpayments" },
   { key: "returns", label: "Returns & Refunds", icon: <ReturnIcon />, path: "/returns" },
   { key: "customers", label: "Customers", icon: <PeopleIcon />, path: "/customers" },
   { key: "indebted", label: "Indebted Clients", icon: <BalanceIcon />, path: "/indebted" },
   { key: "suppliers", label: "Suppliers", icon: <ShippingIcon />, path: "/suppliers" },
-  { key: "todo", label: "To-Do List", icon: <ChecklistIcon />, path: "/todo" },
-  { key: "subscription", label: "Subscription", icon: <VerifiedIcon />, path: "/subscription" },
-  { key: "settings", label: "Settings", icon: <SettingsIcon />, path: "/settings" },
-  { key: "mraCompliance", label: "MRA Compliance", icon: <VerifiedUserIcon />, path: "/mra-compliance" },
+  { key: "profile", label: "My Profile", icon: <AccountCircleIcon />, path: "/profile" },
+  // Removed from sidebar per requirements:
+  // { key: "todo", label: "To-Do List", icon: <ChecklistIcon />, path: "/todo" },
+  // { key: "subscription", label: "Subscription", icon: <VerifiedIcon />, path: "/subscription" },
+  // { key: "settings", label: "Settings", icon: <SettingsIcon />, path: "/settings" },
+  // { key: "mraCompliance", label: "MRA Compliance", icon: <VerifiedUserIcon />, path: "/mra-compliance" },
 ]
 
 // Permission required to access each tab
@@ -42,12 +47,11 @@ export const tabPermissions = {
   quotations: "view_quotations",
   cashsales: "create_sales",
   creditsales: "create_sales",
+  creditpayments: "create_sales", // Same permission as sales - staff can record payments
   returns: "create_sales",
   customers: "view_customers",
   indebted: "view_reports",
   suppliers: "view_suppliers",
-  todo: "view_dashboard",
-  subscription: "all",
-  settings: "view_reports",
-  mraCompliance: "view_reports",
+  profile: null, // No permission required - all users can access their profile
+  // Removed: todo, subscription, settings, mraCompliance
 }

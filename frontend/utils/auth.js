@@ -16,10 +16,17 @@ export const login = async (email, password) => {
 };
 
 export const logout = async () => {
-    await api.post('/auth/logout');
+    try {
+        await api.post('/auth/logout');
+    } catch (error) {
+        // Ignore errors from logout endpoint
+    }
+    
     try {
         if (typeof window !== 'undefined') {
             localStorage.removeItem('current-user');
+            // Redirect to login page after logout
+            window.location.href = '/login';
         }
     } catch (_) {}
 };

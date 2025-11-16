@@ -237,6 +237,301 @@ ${emailData.contactEmail}
   }
 };
 
+// Send password verification code email
+exports.sendPasswordVerificationEmail = async (email, code, userName) => {
+  try {
+    const transporter = createTransporter();
+    
+    const companyName = process.env.COMPANY_NAME || 'Your Company';
+    
+    // Simple HTML email
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+    .code-box { background: white; border: 2px solid #4caf50; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
+    .code { font-size: 32px; font-weight: bold; color: #4caf50; letter-spacing: 8px; font-family: 'Courier New', monospace; }
+    .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px; }
+    .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 20px 0; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🔐 Password Change Verification</h1>
+    </div>
+    <div class="content">
+      <p>Hello <strong>${userName}</strong>,</p>
+      
+      <p>You have requested to change your password for your ${companyName} account.</p>
+      
+      <p>Please use the following verification code to proceed:</p>
+      
+      <div class="code-box">
+        <div class="code">${code}</div>
+        <p style="margin: 10px 0 0; color: #666; font-size: 14px;">This code will expire in 10 minutes</p>
+      </div>
+      
+      <div class="warning">
+        <strong>⚠️ Security Notice:</strong> If you did not request this password change, please ignore this email and ensure your account is secure.
+      </div>
+      
+      <p>For security reasons:</p>
+      <ul>
+        <li>This code can only be used once</li>
+        <li>You have 3 attempts to enter the correct code</li>
+        <li>The code will expire after 10 minutes</li>
+      </ul>
+      
+      <p>If you need assistance, please contact our support team.</p>
+      
+      <p>Best regards,<br><strong>${companyName} Team</strong></p>
+    </div>
+    <div class="footer">
+      <p>© ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
+      <p>This is an automated message, please do not reply to this email.</p>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    const mailOptions = {
+      from: `"${companyName}" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: `Password Change Verification Code - ${companyName}`,
+      html: htmlContent,
+      text: `
+Hello ${userName},
+
+You have requested to change your password for your ${companyName} account.
+
+Your verification code is: ${code}
+
+This code will expire in 10 minutes and can only be used once.
+You have 3 attempts to enter the correct code.
+
+If you did not request this password change, please ignore this email.
+
+Best regards,
+${companyName} Team
+      `.trim(),
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Password verification email sent to ${email}`);
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Error sending verification email:', error);
+    throw error;
+  }
+};
+
+// Send new user credentials email
+exports.sendNewUserCredentials = async (email, username, password, userName) => {
+  const companyName = process.env.COMPANY_NAME || 'POS System';
+  const systemUrl = process.env.SYSTEM_URL || 'http://localhost:3000';
+
+  const mailOptions = {
+    from: `"${companyName}" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: `Welcome to ${companyName} - Your Account Details`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .header {
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-radius: 10px 10px 0 0;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 28px;
+          }
+          .content {
+            background: #f9f9f9;
+            padding: 30px;
+            border: 1px solid #e0e0e0;
+          }
+          .credentials-box {
+            background: white;
+            border: 2px solid #4caf50;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+          }
+          .credential-item {
+            margin: 15px 0;
+            padding: 10px;
+            background: #f5f5f5;
+            border-left: 4px solid #4caf50;
+          }
+          .credential-label {
+            font-weight: bold;
+            color: #4caf50;
+            font-size: 14px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+          }
+          .credential-value {
+            font-size: 18px;
+            font-family: 'Courier New', monospace;
+            color: #333;
+            word-break: break-all;
+          }
+          .button {
+            display: inline-block;
+            background: #4caf50;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+          }
+          .warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+          }
+          .footer {
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>🎉 Welcome to ${companyName}!</h1>
+        </div>
+        
+        <div class="content">
+          <p>Hello <strong>${userName}</strong>,</p>
+          
+          <p>Your account has been created successfully! An administrator has set up your access to our system.</p>
+          
+          <div class="credentials-box">
+            <h3 style="color: #4caf50; margin-top: 0;">Your Login Credentials</h3>
+            
+            <div class="credential-item">
+              <div class="credential-label">Username</div>
+              <div class="credential-value">${username}</div>
+            </div>
+            
+            <div class="credential-item">
+              <div class="credential-label">Email</div>
+              <div class="credential-value">${email}</div>
+            </div>
+            
+            <div class="credential-item">
+              <div class="credential-label">Temporary Password</div>
+              <div class="credential-value">${password}</div>
+            </div>
+          </div>
+          
+          <div style="text-align: center;">
+            <a href="${systemUrl}" class="button">Login to Your Account</a>
+          </div>
+          
+          <div class="warning">
+            <strong>⚠️ Important Security Notice:</strong>
+            <ul style="margin: 10px 0; padding-left: 20px;">
+              <li>This is your temporary password</li>
+              <li>Please change your password immediately after your first login</li>
+              <li>Go to your profile settings to update your password</li>
+              <li>Never share your password with anyone</li>
+              <li>Keep this email secure or delete it after changing your password</li>
+            </ul>
+          </div>
+          
+          <p><strong>Next Steps:</strong></p>
+          <ol>
+            <li>Click the button above or visit: <a href="${systemUrl}">${systemUrl}</a></li>
+            <li>Login with your username and temporary password</li>
+            <li>Navigate to your profile settings</li>
+            <li>Change your password to something secure and memorable</li>
+          </ol>
+          
+          <p>If you have any questions or need assistance, please contact your system administrator.</p>
+          
+          <p style="margin-top: 30px;">
+            Best regards,<br>
+            <strong>${companyName} Team</strong>
+          </p>
+        </div>
+        
+        <div class="footer">
+          <p>This is an automated message. Please do not reply to this email.</p>
+          <p>&copy; ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `
+Welcome to ${companyName}!
+
+Hello ${userName},
+
+Your account has been created successfully! An administrator has set up your access to our system.
+
+YOUR LOGIN CREDENTIALS:
+Username: ${username}
+Email: ${email}
+Temporary Password: ${password}
+
+IMPORTANT SECURITY NOTICE:
+- This is your temporary password
+- Please change your password immediately after your first login
+- Go to your profile settings to update your password
+- Never share your password with anyone
+
+NEXT STEPS:
+1. Visit: ${systemUrl}
+2. Login with your username and temporary password
+3. Navigate to your profile settings
+4. Change your password to something secure and memorable
+
+If you have any questions or need assistance, please contact your system administrator.
+
+Best regards,
+${companyName} Team
+
+This is an automated message. Please do not reply to this email.
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log('✅ New user credentials email sent successfully to:', email);
+  } catch (error) {
+    console.error('❌ Error sending new user credentials email:', error);
+    throw error;
+  }
+};
+
 // Validate email configuration
 exports.validateEmailConfig = () => {
   const requiredEnvVars = ['EMAIL_USER', 'EMAIL_PASSWORD'];
@@ -248,3 +543,4 @@ exports.validateEmailConfig = () => {
   
   return true;
 };
+

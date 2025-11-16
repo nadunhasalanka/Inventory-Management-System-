@@ -21,6 +21,7 @@ import {
   Select,
   Chip,
   Alert,
+  Box,
 } from "@mui/material"
 import { ReceiptLong, QrCode2, Delete, Close } from "@mui/icons-material"
 // Replaced mock inventoryRows with live products via backend
@@ -59,23 +60,26 @@ export default function CashSales() {
   const [showInvoice, setShowInvoice] = useState(false)
   const [invoiceData, setInvoiceData] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [showVariantDialog, setShowVariantDialog] = useState(false)
+  const [selectedProductForVariant, setSelectedProductForVariant] = useState(null)
+  const [selectedVariant, setSelectedVariant] = useState(null)
   const queryClient = useQueryClient()
   const { currentUser } = useCurrentUser()
 
   // Fetch products (cached)
-  const { data: products = [] } = useQuery({
+  const { data: products = [], isLoading: loadingProducts } = useQuery({
     queryKey: ["products"],
     queryFn: () => fetchProducts(),
   })
 
   // Fetch customers (public endpoint)
-  const { data: customers = [] } = useQuery({
+  const { data: customers = [], isLoading: loadingCustomers } = useQuery({
     queryKey: ["customers"],
     queryFn: () => fetchCustomers(),
   })
 
   // Fetch locations (protected; assumes user is authenticated)
-  const { data: locations = [] } = useQuery({
+  const { data: locations = [], isLoading: loadingLocations } = useQuery({
     queryKey: ["locations"],
     queryFn: fetchLocations,
   })
@@ -106,23 +110,81 @@ export default function CashSales() {
 
   // Filter product pool by query (name or SKU)
   const pool = useMemo(() => {
+    if (!Array.isArray(products)) return []
     const q = query.toLowerCase()
     return products.filter((p) => (p.name || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q))
   }, [query, products])
 
-  const addToCart = (item) =>
+  const addToCart = (item, variant = null) => {
     setCart((prev) => {
-      const f = prev.find((p) => p.sku === item.sku)
+      // Create unique identifier including variant info
+      const itemKey = variant 
+        ? `${item.sku}-${variant.name}-${variant.value}` 
+        : item.sku
+      
+      const existingItem = prev.find((p) => {
+        const cartKey = p.variant 
+          ? `${p.sku}-${p.variant.name}-${p.variant.value}` 
+          : p.sku
+        return cartKey === itemKey
+      })
+
+      // Calculate price including variant additional price
+      const basePrice = item.selling_price ?? item.price ?? 0
+      const variantPrice = variant ? (variant.additional_price || 0) : 0
+      const finalPrice = basePrice + variantPrice
+
       // Map backend product shape to expected cart item properties
-      const mapped = { ...item, price: item.selling_price ?? item.price ?? 0 }
-      return f ? prev.map((p) => (p.sku === item.sku ? { ...p, qty: p.qty + 1 } : p)) : [...prev, { ...mapped, qty: 1 }]
+      const mapped = { 
+        ...item, 
+        price: finalPrice,
+        variant: variant ? {
+          name: variant.name,
+          value: variant.value,
+          sku_suffix: variant.sku_suffix || "",
+          additional_price: variant.additional_price || 0
+        } : null,
+        displayName: variant ? `${item.name} (${variant.name}: ${variant.value})` : item.name
+      }
+
+      return existingItem 
+        ? prev.map((p) => {
+            const cartKey = p.variant 
+              ? `${p.sku}-${p.variant.name}-${p.variant.value}` 
+              : p.sku
+            return cartKey === itemKey ? { ...p, qty: p.qty + 1 } : p
+          })
+        : [...prev, { ...mapped, qty: 1 }]
     })
+  }
+
+  const handleProductClick = (product) => {
+    // Check if product has variants
+    if (product.variants && product.variants.length > 0) {
+      setSelectedProductForVariant(product)
+      setSelectedVariant(null)
+      setShowVariantDialog(true)
+    } else {
+      addToCart(product)
+    }
+  }
+
+  const handleAddWithVariant = () => {
+    if (!selectedVariant) {
+      alert("Please select a variant")
+      return
+    }
+    addToCart(selectedProductForVariant, selectedVariant)
+    setShowVariantDialog(false)
+    setSelectedProductForVariant(null)
+    setSelectedVariant(null)
+  }
 
   const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0)
   const discountAmount = discount.type === "percentage" ? (subtotal * discount.value) / 100 : discount.value
   const afterDiscount = subtotal - discountAmount
-  const tax = afterDiscount * 0.15
-  const total = afterDiscount + tax
+  const tax = 0 // Tax removed
+  const total = afterDiscount // No tax added
 
   const handleGenerateInvoice = async () => {
     if (cart.length === 0) return
@@ -154,12 +216,27 @@ export default function CashSales() {
       return
     }
 
+    // Prepare items for backend - strip out variant UI fields
+    const backendItems = cart.map(item => ({
+      _id: item._id,
+      sku: item.sku,
+      name: item.name,
+      qty: item.qty,
+      price: item.price,
+      // Store variant info in metadata for invoice/reporting
+      variant_info: item.variant ? {
+        name: item.variant.name,
+        value: item.variant.value,
+        sku_suffix: item.variant.sku_suffix
+      } : null
+    }))
+
     let salesOrder = null
     try {
       salesOrder = await processCheckout({
         customer_id: customerId,
         location_id: locId,
-        items: cart,
+        items: backendItems,
         payment: {
           type: paymentTypeMap[paymentMethod],
           amount_paid_cash: paymentMethod === "split" ? splitCash : total,
@@ -169,7 +246,11 @@ export default function CashSales() {
       // Invalidate inventory summary to refresh stock globally
       queryClient.invalidateQueries({ queryKey: ["inventory","summary"] })
     } catch (e) {
-      alert(e?.response?.data?.message || "Checkout failed")
+      const errorMsg = e?.response?.data?.message || e?.message || "Checkout failed"
+      console.error("Checkout error:", e)
+      console.error("Cart items:", cart)
+      console.error("Backend items:", backendItems)
+      alert(`Checkout Error: ${errorMsg}\n\nThis might be a stock/batch tracking issue. Please check the Inventory page.`)
       setIsProcessing(false)
       return
     }
@@ -218,260 +299,364 @@ export default function CashSales() {
   }
 
   return (
-    <Section title="Cash Sales" breadcrumbs={["Home", "Sales", "Cash"]}>
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={8}>
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Typography variant="subtitle1" className="font-semibold">
+    <>
+      {/* NEW CLEAN LAYOUT */}
+      <Section title="Cash Sales" breadcrumbs={["Home", "Sales", "Cash"]}>
+        <Grid container spacing={4}>
+          
+          {/* Payment Summary - LEFT SIDE (md=4) */}
+          <Grid item xs={12} md={4} sx={{ order: { xs: 2, md: 1 } }}>
+            <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
+                  Payment Summary
+                </Typography>
+
+                {/* Location */}
+                <Box sx={{ mb: 2.5 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Location</InputLabel>
+                    <Select
+                      value={selectedLocationId}
+                      label="Location"
+                      onChange={(e) => setSelectedLocationId(e.target.value)}
+                    >
+                      {locations.map((l) => (
+                        <MenuItem key={l._id} value={l._id}>
+                          {l.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Box>
+
+                {/* Customer */}
+                <Box sx={{ mb: 2.5 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Customer</InputLabel>
+                    <Select
+                      value={selectedCustomerId}
+                      label="Customer"
+                      onChange={(e) => setSelectedCustomerId(e.target.value)}
+                    >
+                      {customers.map((c) => (
+                        <MenuItem key={c._id} value={c._id}>
+                          {c.name || c.first_name + " " + c.last_name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Box>
+
+                {/* Customer Name Optional */}
+                <Box sx={{ mb: 2.5 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Customer Name (Optional)"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="Walk-in Customer"
+                  />
+                </Box>
+
+                {/* Payment Method */}
+                <Box sx={{ mb: 2.5 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Payment Method</InputLabel>
+                    <Select value={paymentMethod} label="Payment Method" onChange={(e) => setPaymentMethod(e.target.value)}>
+                      {PAYMENT_METHODS.map((method) => (
+                        <MenuItem key={method.value} value={method.value}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <span>{method.icon}</span>
+                            <span>{method.label}</span>
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Box>
+
+                {/* Payment Reference */}
+                {paymentMethod !== "cash" && paymentMethod !== "split" && paymentMethod !== "credit" && (
+                  <Box sx={{ mb: 2.5 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Payment Reference"
+                      value={paymentReference}
+                      onChange={(e) => setPaymentReference(e.target.value)}
+                      placeholder={
+                        paymentMethod === "card"
+                          ? "Last 4 digits"
+                          : paymentMethod === "mobile_money"
+                            ? "Transaction ID"
+                            : paymentMethod === "bank_transfer"
+                              ? "Transfer reference"
+                              : "Cheque number"
+                      }
+                      helperText="Optional reference for tracking"
+                    />
+                  </Box>
+                )}
+
+                {/* Split Payment */}
+                {paymentMethod === "split" && (
+                  <Box sx={{ mb: 2.5 }}>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                      <Chip size="small" label="0%" onClick={() => { setSplitCash(0); setSplitCredit(total); }} />
+                      <Chip size="small" label="50%" onClick={() => { const v = Number((total * 0.5).toFixed(2)); setSplitCash(v); setSplitCredit(Number((total - v).toFixed(2))); }} />
+                      <Chip size="small" label="100%" onClick={() => { setSplitCash(total); setSplitCredit(0); }} />
+                    </Box>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Amount Paid Now (Cash)"
+                      value={splitCash}
+                      onChange={(e) => {
+                        const v = Math.max(0, Math.min(total, Number(e.target.value) || 0));
+                        setSplitCash(v);
+                        setSplitCredit(Number((total - v).toFixed(2)));
+                      }}
+                      size="small"
+                      helperText={`Credit to book: $${Number(splitCredit).toFixed(2)} (Total: $${total.toFixed(2)})`}
+                    />
+                  </Box>
+                )}
+
+                {/* Credit Alert */}
+                {paymentMethod === "credit" && (
+                  <Box sx={{ mb: 2.5 }}>
+                    <Alert severity="info">Entire amount will be booked to customer credit balance.</Alert>
+                  </Box>
+                )}
+
+                {/* Discount */}
+                <Box sx={{ mb: 2.5 }}>
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <TextField
+                      select
+                      label="Discount Type"
+                      value={discount.type}
+                      onChange={(e) => setDiscount((prev) => ({ ...prev, type: e.target.value }))}
+                      sx={{ width: 120 }}
+                      size="small"
+                    >
+                      <MenuItem value="percentage">%</MenuItem>
+                      <MenuItem value="fixed">$</MenuItem>
+                    </TextField>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Discount"
+                      value={discount.value}
+                      onChange={(e) => setDiscount((prev) => ({ ...prev, value: Number.parseFloat(e.target.value) || 0 }))}
+                      inputProps={{ min: 0, step: 0.01 }}
+                      size="small"
+                    />
+                  </Box>
+                </Box>
+
+                <Divider sx={{ my: 2.5 }} />
+
+                {/* Price Summary - NO TAX */}
+                <Box sx={{ mb: 2.5 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
+                    <span>Subtotal</span>
+                    <Typography sx={{ fontWeight: 500 }}>${subtotal.toFixed(2)}</Typography>
+                  </Box>
+                  {discountAmount > 0 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem', color: '#4caf50' }}>
+                      <span>Discount ({discount.type === "percentage" ? `${discount.value}%` : "$"})</span>
+                      <Typography sx={{ fontWeight: 500 }}>-${discountAmount.toFixed(2)}</Typography>
+                    </Box>
+                  )}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: 600, pt: 1 }}>
+                    <span>Total</span>
+                    <span>${total.toFixed(2)}</span>
+                  </Box>
+                </Box>
+
+                {/* Buttons */}
+                <Box>
+                  <Button
+                    variant="contained"
+                    startIcon={<ReceiptLong />}
+                    onClick={handleGenerateInvoice}
+                    disabled={cart.length === 0 || isProcessing || (paymentMethod === "split" && (Number((splitCash + splitCredit).toFixed(2)) !== Number(total.toFixed(2))))}
+                    fullWidth
+                    sx={{ 
+                      mb: 1.5,
+                      bgcolor: '#4caf50',
+                      '&:hover': { bgcolor: '#45a049' }
+                    }}
+                  >
+                    {isProcessing ? "Processing..." : "Checkout & Fiscalize"}
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    startIcon={<QrCode2 />} 
+                    disabled 
+                    size="small"
+                    fullWidth
+                    sx={{ borderColor: '#4caf5050', color: '#4caf50' }}
+                  >
+                    Preview Invoice
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Items Selection - RIGHT SIDE (md=8) */}
+          <Grid item xs={12} md={8} sx={{ order: { xs: 1, md: 2 } }}>
+            <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
                   Select Items
                 </Typography>
-                <SearchInput placeholder="Search products" value={query} onChange={setQuery} />
-              </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-[300px] overflow-y-auto p-2">
-                {pool.slice(0, 16).map((p) => (
-                  <Button
-                    key={p.sku}
-                    variant="outlined"
-                    onClick={() => addToCart(p)}
-                    className="justify-between flex-col items-start h-auto py-2"
-                    size="small"
-                  >
-                    <span className="truncate text-left w-full text-xs">{p.name}</span>
-                    <span className="font-semibold">${Number(p.selling_price ?? p.price ?? 0).toFixed(2)}</span>
-                  </Button>
-                ))}
-              </div>
+                {/* Product Grid */}
+                <Box sx={{ mb: 3 }}>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-[300px] overflow-y-auto p-2">
+                    {loadingProducts ? (
+                      <div className="col-span-4 text-center py-8 text-slate-500">
+                        Loading products...
+                      </div>
+                    ) : pool.length === 0 ? (
+                      <div className="col-span-4 text-center py-8 text-slate-500">
+                        No products found
+                      </div>
+                    ) : (
+                      pool.slice(0, 16).map((p) => (
+                        <Button
+                          key={p.sku}
+                          variant="outlined"
+                          onClick={() => handleProductClick(p)}
+                          className="justify-between flex-col items-start h-auto py-2"
+                          size="small"
+                          sx={{
+                            borderColor: '#4caf5050',
+                            '&:hover': {
+                              borderColor: '#4caf50',
+                              bgcolor: '#4caf5010'
+                            }
+                          }}
+                        >
+                          <span className="truncate text-left w-full text-xs">{p.name}</span>
+                          <div className="w-full flex items-center justify-between">
+                            <span className="font-semibold">Rs {Number(p.selling_price ?? p.price ?? 0).toFixed(2)}</span>
+                            {p.variants && p.variants.length > 0 && (
+                              <Chip 
+                                label={`${p.variants.length}v`} 
+                                size="small" 
+                                sx={{ 
+                                  height: 16, 
+                                  fontSize: '0.65rem',
+                                  bgcolor: '#4caf5020',
+                                  color: '#4caf50'
+                                }} 
+                              />
+                            )}
+                          </div>
+                        </Button>
+                      ))
+                    )}
+                  </div>
+                </Box>
 
-              <Divider />
+                <Divider sx={{ my: 3 }} />
 
-              <div className="space-y-2">
-                <Typography variant="subtitle2" className="font-semibold">
-                  Cart Items
-                </Typography>
-                {cart.length === 0 && (
-                  <Typography color="text.secondary" className="text-sm">
-                    No items added yet
+                {/* Cart Items */}
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+                    Cart Items
                   </Typography>
-                )}
-                {cart.map((c) => (
-                  <div key={c.sku} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-50">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium text-sm">{c.name}</div>
-                      <div className="text-xs text-slate-500">
-                        {c.qty} × ${c.price.toFixed(2)} = ${(c.qty * c.price).toFixed(2)}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <IconButton
-                        size="small"
-                        onClick={() =>
-                          setCart((prev) =>
-                            prev.map((p) => (p.sku === c.sku ? { ...p, qty: Math.max(1, p.qty - 1) } : p)),
-                          )
-                        }
-                      >
-                        -
-                      </IconButton>
-                      <span className="text-sm font-medium w-6 text-center">{c.qty}</span>
-                      <IconButton
-                        size="small"
-                        onClick={() =>
-                          setCart((prev) => prev.map((p) => (p.sku === c.sku ? { ...p, qty: p.qty + 1 } : p)))
-                        }
-                      >
-                        +
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => setCart((prev) => prev.filter((p) => p.sku !== c.sku))}
-                      >
-                        <Delete fontSize="small" />
-                      </IconButton>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  {cart.length === 0 && (
+                    <Typography color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                      No items added yet
+                    </Typography>
+                  )}
+                  {cart.map((c, index) => {
+                    const itemKey = c.variant 
+                      ? `${c.sku}-${c.variant.name}-${c.variant.value}-${index}` 
+                      : `${c.sku}-${index}`
+                    return (
+                      <Box key={itemKey} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 2, borderRadius: 2, bgcolor: '#f8f9fa', mb: 2 }}>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {c.displayName || c.name}
+                            {c.variant && c.variant.additional_price !== 0 && (
+                              <span style={{ fontSize: '0.75rem', color: '#4caf50', marginLeft: '4px' }}>
+                                (+Rs {c.variant.additional_price.toFixed(2)})
+                              </span>
+                            )}
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+                            {c.qty} × Rs {c.price.toFixed(2)} = Rs {(c.qty * c.price).toFixed(2)}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setCart((prev) => {
+                                const cartKey = c.variant 
+                                  ? `${c.sku}-${c.variant.name}-${c.variant.value}` 
+                                  : c.sku
+                                return prev.map((p, i) => {
+                                  const pKey = p.variant 
+                                    ? `${p.sku}-${p.variant.name}-${p.variant.value}` 
+                                    : p.sku
+                                  return pKey === cartKey && i === index 
+                                    ? { ...p, qty: Math.max(1, p.qty - 1) } 
+                                    : p
+                                })
+                              })
+                            }}
+                          >
+                            -
+                          </IconButton>
+                          <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, minWidth: 24, textAlign: 'center' }}>{c.qty}</Typography>
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setCart((prev) => {
+                                const cartKey = c.variant 
+                                  ? `${c.sku}-${c.variant.name}-${c.variant.value}` 
+                                  : c.sku
+                                return prev.map((p, i) => {
+                                  const pKey = p.variant 
+                                    ? `${p.sku}-${p.variant.name}-${p.variant.value}` 
+                                    : p.sku
+                                  return pKey === cartKey && i === index 
+                                    ? { ...p, qty: p.qty + 1 } 
+                                    : p
+                                })
+                              })
+                            }}
+                          >
+                            +
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => setCart((prev) => prev.filter((_, i) => i !== index))}
+                          >
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                    )
+                  })}
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
         </Grid>
-
-        <Grid item xs={12} md={4}>
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent className="space-y-3">
-              <Typography variant="subtitle1" className="font-semibold">
-                Payment Summary
-              </Typography>
-
-              {/* Location selection (minimal UI impact) */}
-              <FormControl fullWidth>
-                <InputLabel>Location</InputLabel>
-                <Select
-                  value={selectedLocationId}
-                  label="Location"
-                  onChange={(e) => setSelectedLocationId(e.target.value)}
-                >
-                  {locations.map((l) => (
-                    <MenuItem key={l._id} value={l._id}>
-                      {l.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              {/* Customer selection (forced to Walk-in) */}
-              <FormControl fullWidth>
-                <InputLabel>Customer</InputLabel>
-                <Select
-                  value={selectedCustomerId}
-                  label="Customer"
-                  onChange={(e) => setSelectedCustomerId(e.target.value)}
-                  disabled
-                >
-                  {customers.map((c) => (
-                    <MenuItem key={c._id} value={c._id}>
-                      {c.name || c.first_name + " " + c.last_name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              {/* Fallback manual name entry */}
-              <TextField
-                fullWidth
-                label="Customer Name (Optional)"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                disabled
-                placeholder="Walk-in Customer"
-              />
-
-              <FormControl fullWidth>
-                <InputLabel>Payment Method</InputLabel>
-                <Select value={paymentMethod} label="Payment Method" onChange={(e) => setPaymentMethod(e.target.value)}>
-                  {PAYMENT_METHODS.map((method) => (
-                    <MenuItem key={method.value} value={method.value}>
-                      <div className="flex items-center gap-2">
-                        <span>{method.icon}</span>
-                        <span>{method.label}</span>
-                      </div>
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              {paymentMethod !== "cash" && paymentMethod !== "split" && paymentMethod !== "credit" && (
-                <TextField
-                  fullWidth
-                  label="Payment Reference"
-                  value={paymentReference}
-                  onChange={(e) => setPaymentReference(e.target.value)}
-                  placeholder={
-                    paymentMethod === "card"
-                      ? "Last 4 digits"
-                      : paymentMethod === "mobile_money"
-                        ? "Transaction ID"
-                        : paymentMethod === "bank_transfer"
-                          ? "Transfer reference"
-                          : "Cheque number"
-                  }
-                  helperText="Optional reference for tracking"
-                />
-              )}
-
-              {paymentMethod === "split" && (
-                <div className="flex flex-col gap-3">
-                  <div className="flex gap-2 flex-wrap">
-                    <Chip size="small" label="0%" onClick={() => { setSplitCash(0); setSplitCredit(total); }} />
-                    <Chip size="small" label="50%" onClick={() => { const v = Number((total * 0.5).toFixed(2)); setSplitCash(v); setSplitCredit(Number((total - v).toFixed(2))); }} />
-                    <Chip size="small" label="100%" onClick={() => { setSplitCash(total); setSplitCredit(0); }} />
-                  </div>
-                  <TextField
-                    type="number"
-                    label="Amount Paid Now (Cash)"
-                    value={splitCash}
-                    onChange={(e) => {
-                      const v = Math.max(0, Math.min(total, Number(e.target.value) || 0));
-                      setSplitCash(v);
-                      setSplitCredit(Number((total - v).toFixed(2)));
-                    }}
-                    size="small"
-                    helperText={`Credit to book: $${Number(splitCredit).toFixed(2)} (Total: $${total.toFixed(2)})`}
-                  />
-                </div>
-              )}
-              {paymentMethod === "credit" && (
-                <Alert severity="info">Entire amount will be booked to customer credit balance.</Alert>
-              )}
-
-              <div className="flex gap-2">
-                <TextField
-                  select
-                  label="Discount Type"
-                  value={discount.type}
-                  onChange={(e) => setDiscount((prev) => ({ ...prev, type: e.target.value }))}
-                  className="w-32"
-                  size="small"
-                >
-                  <MenuItem value="percentage">%</MenuItem>
-                  <MenuItem value="fixed">$</MenuItem>
-                </TextField>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="Discount"
-                  value={discount.value}
-                  onChange={(e) => setDiscount((prev) => ({ ...prev, value: Number.parseFloat(e.target.value) || 0 }))}
-                  inputProps={{ min: 0, step: 0.01 }}
-                  size="small"
-                />
-              </div>
-
-              <Divider />
-
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span className="font-medium">${subtotal.toFixed(2)}</span>
-                </div>
-                {discountAmount > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount ({discount.type === "percentage" ? `${discount.value}%` : "$"})</span>
-                    <span className="font-medium">-${discountAmount.toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span>Tax (15%)</span>
-                  <span className="font-medium">${tax.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-base font-semibold">
-                  <span>Total</span>
-                  <span>${total.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Button
-                  variant="contained"
-                  startIcon={<ReceiptLong />}
-                  onClick={handleGenerateInvoice}
-                  disabled={cart.length === 0 || isProcessing || (paymentMethod === "split" && (Number((splitCash + splitCredit).toFixed(2)) !== Number(total.toFixed(2))))}
-                  fullWidth
-                >
-                  {isProcessing ? "Processing..." : "Checkout & Fiscalize"}
-                </Button>
-                <Button variant="outlined" startIcon={<QrCode2 />} disabled size="small">
-                  Preview Invoice
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
+      </Section>
+      {/* Invoice Dialog */}
       <Dialog open={showInvoice} onClose={() => setShowInvoice(false)} maxWidth="md" fullWidth>
         <DialogTitle className="flex items-center justify-between">
           <span>MRA Fiscalized Invoice</span>
@@ -568,8 +753,13 @@ export default function CashSales() {
                   <div key={i} className="flex justify-between text-sm py-1">
                     <span>
                       {item.name} × {item.quantity}
+                      {item.variant && (
+                        <span className="text-xs text-slate-500 ml-1">
+                          ({item.variant})
+                        </span>
+                      )}
                     </span>
-                    <span className="font-medium">${item.total.toFixed(2)}</span>
+                    <span className="font-medium">Rs {item.total.toFixed(2)}</span>
                   </div>
                 ))}
               </div>
@@ -626,6 +816,58 @@ export default function CashSales() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Section>
+
+      {/* Variant Selection Dialog */}
+      <Dialog open={showVariantDialog} onClose={() => setShowVariantDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Select Variant
+          {selectedProductForVariant && (
+            <Typography variant="body2" color="text.secondary">
+              {selectedProductForVariant.name}
+            </Typography>
+          )}
+        </DialogTitle>
+        <DialogContent>
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>Choose Variant</InputLabel>
+            <Select
+              value={selectedVariant ? JSON.stringify(selectedVariant) : ""}
+              label="Choose Variant"
+              onChange={(e) => setSelectedVariant(JSON.parse(e.target.value))}
+            >
+              {selectedProductForVariant?.variants?.map((variant, index) => {
+                const variantPrice = (selectedProductForVariant.selling_price || 0) + (variant.additional_price || 0)
+                return (
+                  <MenuItem key={index} value={JSON.stringify(variant)}>
+                    <div className="flex justify-between items-center w-full">
+                      <span>
+                        {variant.name}: {variant.value}
+                        {variant.sku_suffix && (
+                          <span className="text-xs text-slate-500 ml-1">({variant.sku_suffix})</span>
+                        )}
+                      </span>
+                      <span className="font-semibold ml-4">
+                        Rs {variantPrice.toFixed(2)}
+                        {variant.additional_price !== 0 && (
+                          <span className="text-xs text-green-600 ml-1">
+                            (+Rs {variant.additional_price.toFixed(2)})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </MenuItem>
+                )
+              })}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowVariantDialog(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleAddWithVariant} disabled={!selectedVariant}>
+            Add to Cart
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   )
 }

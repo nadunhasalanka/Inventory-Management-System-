@@ -26,6 +26,7 @@ import {
   FormControl,
   InputLabel,
   Select,
+  Box,
 } from "@mui/material"
 import { AssignmentReturn, Delete, Close, Visibility, Receipt } from "@mui/icons-material"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -145,264 +146,337 @@ export default function Returns() {
 
   return (
     <Section title="Returns & Refunds" breadcrumbs={["Home", "Sales", "Returns"]}>
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={8}>
-          <Card className="rounded-2xl shadow-sm mb-4">
-            <CardContent className="space-y-3">
-              <Typography variant="subtitle1" className="font-semibold">
-                Return Details
+      <Grid container spacing={4}>
+        
+        {/* Refund Summary - LEFT SIDE (md=5) */}
+        <Grid item xs={12} md={5} sx={{ order: { xs: 2, md: 1 } }}>
+          <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
+                Refund Summary
               </Typography>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Return Type */}
+              <Box sx={{ mb: 2.5 }}>
                 <TextField
                   select
                   fullWidth
                   label="Return Type"
                   value={returnType}
                   onChange={(e) => setReturnType(e.target.value)}
+                  size="small"
                 >
                   <MenuItem value="cash">Cash Sale Return</MenuItem>
                   <MenuItem value="credit">Credit Sale Return</MenuItem>
                 </TextField>
+              </Box>
 
+              {/* Customer (for credit returns) */}
+              {returnType === "credit" && (
+                <Box sx={{ mb: 2.5 }}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Customer"
+                    value={selectedCustomer?.id || ""}
+                    onChange={(e) => {
+                      const customer = customers.find((c) => c.id === Number.parseInt(e.target.value))
+                      setSelectedCustomer(customer || null)
+                    }}
+                    size="small"
+                  >
+                    <MenuItem value="">Select Customer</MenuItem>
+                    {customers.map((c) => (
+                      <MenuItem key={c._id} value={c._id}>
+                        {c.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+              )}
+
+              {/* Original Invoice Number */}
+              <Box sx={{ mb: 2.5 }}>
                 <TextField
                   fullWidth
                   label="Original Invoice Number"
                   value={invoiceNumber}
                   onChange={(e) => setInvoiceNumber(e.target.value)}
                   placeholder="INV-001234"
+                  size="small"
                 />
-              </div>
+              </Box>
 
-              {returnType === "credit" && (
+              {/* Refund Method */}
+              <Box sx={{ mb: 2.5 }}>
                 <TextField
                   select
                   fullWidth
-                  label="Customer"
-                  value={selectedCustomer?.id || ""}
-                  onChange={(e) => {
-                    const customer = customers.find((c) => c.id === Number.parseInt(e.target.value))
-                    setSelectedCustomer(customer || null)
-                  }}
+                  label="Refund Method"
+                  value={refundMethod}
+                  onChange={(e) => setRefundMethod(e.target.value)}
+                  size="small"
                 >
-                  <MenuItem value="">Select Customer</MenuItem>
-                  {customers.map((c) => (
-                    <MenuItem key={c._id} value={c._id}>
-                      {c.name}
-                    </MenuItem>
-                  ))}
+                  <MenuItem value="cash">Cash Refund</MenuItem>
+                  <MenuItem value="credit_note">Credit Note</MenuItem>
+                  <MenuItem value="bank_transfer">Bank Transfer</MenuItem>
+                  <MenuItem value="store_credit">Store Credit</MenuItem>
                 </TextField>
-              )}
+              </Box>
 
-              <TextField
-                select
-                fullWidth
-                label="Refund Method"
-                value={refundMethod}
-                onChange={(e) => setRefundMethod(e.target.value)}
-              >
-                <MenuItem value="cash">Cash Refund</MenuItem>
-                <MenuItem value="credit_note">Credit Note</MenuItem>
-                <MenuItem value="bank_transfer">Bank Transfer</MenuItem>
-                <MenuItem value="store_credit">Store Credit</MenuItem>
-              </TextField>
-
-              <TextField
-                fullWidth
-                multiline
-                rows={2}
-                label="Return Reason"
-                value={returnReason}
-                onChange={(e) => setReturnReason(e.target.value)}
-                placeholder="Defective, wrong item, customer changed mind..."
-              />
-
-              <FormControl fullWidth>
-                <InputLabel>Restock Location</InputLabel>
-                <Select
-                  value={restockLocationId}
-                  label="Restock Location"
-                  onChange={(e) => setRestockLocationId(e.target.value)}
-                >
-                  {locations.map((loc) => (
-                    <MenuItem key={loc._id} value={loc._id}>
-                      {loc.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <Divider />
-
-              <div className="flex items-center justify-between">
-                <Typography variant="subtitle1" className="font-semibold">
-                  Refundable Items
-                </Typography>
-              </div>
-              {!matchedOrderId && (
-                <Alert severity="info">Enter a valid invoice number to load refundable items.</Alert>
-              )}
-              {matchedOrderId && fetchingRefundable && <Alert severity="info">Loading items...</Alert>}
-              {matchedOrderId && !fetchingRefundable && refundableItems.length === 0 && (
-                <Alert severity="warning">No refundable items remaining for this order.</Alert>
-              )}
-              {matchedOrderId && refundableItems.length > 0 && (
-                <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                  {refundableItems.map(it => (
-                    <div key={it.product_id} className="flex items-center justify-between gap-3 p-2 rounded-lg bg-slate-50 border border-slate-200">
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium text-sm">{it.name}</div>
-                        <div className="text-xs text-slate-500">
-                          Ordered: {it.quantity_ordered} • Available: {it.quantity_available_to_return} • Unit: ${it.unit_price.toFixed(2)}
-                        </div>
-                      </div>
-                      <TextField
-                        type="number"
-                        size="small"
-                        label="Qty"
-                        value={returnQuantities[it.product_id] || ''}
-                        onChange={(e) => updateReturnQty(it.product_id, it.quantity_available_to_return, e.target.value)}
-                        inputProps={{ min: 0, max: it.quantity_available_to_return, style: { width: 70 } }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <Divider />
-
-              <div className="space-y-2">
-                <Typography variant="subtitle2" className="font-semibold">
-                  Selected Return Items
-                </Typography>
-                {returnItems.length === 0 && <Typography className="text-sm text-slate-500">No quantities chosen</Typography>}
-                {returnItems.map(item => (
-                  <div key={item.product_id} className="flex justify-between text-xs bg-red-50 px-2 py-1 rounded">
-                    <span className="truncate">{item.name} × {item.returnQty}</span>
-                    <span className="font-medium">${(item.price * item.returnQty).toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent>
-              <Typography variant="subtitle1" className="font-semibold mb-3">
-                Recent Returns
-              </Typography>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Return #</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Total</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {returns
-                    .slice(-10)
-                    .reverse()
-                    .map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell className="font-mono text-sm">{r.returnNumber}</TableCell>
-                        <TableCell>
-                          <Chip label={r.type} size="small" color={r.type === "credit" ? "warning" : "default"} />
-                        </TableCell>
-                        <TableCell>{new Date(r.createdAt).toLocaleDateString()}</TableCell>
-                        <TableCell className="font-semibold text-red-600">${(r.refund_amount ?? r.total ?? 0).toFixed(2)}</TableCell>
-                        <TableCell>
-                          <Chip label={r.status} size="small" color="success" />
-                        </TableCell>
-                        <TableCell>
-                          <IconButton size="small" onClick={() => setViewReturn(r)}>
-                            <Visibility fontSize="small" />
-                          </IconButton>
-                          <IconButton size="small" onClick={() => handleGenerateCreditNote(r)}>
-                            <Receipt fontSize="small" />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
+              {/* Restock Location */}
+              <Box sx={{ mb: 2.5 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Restock Location</InputLabel>
+                  <Select
+                    value={restockLocationId}
+                    label="Restock Location"
+                    onChange={(e) => setRestockLocationId(e.target.value)}
+                  >
+                    {locations.map((loc) => (
+                      <MenuItem key={loc._id} value={loc._id}>
+                        {loc.name}
+                      </MenuItem>
                     ))}
-                  {returns.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center text-slate-500">
-                        No returns yet
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </Grid>
+                  </Select>
+                </FormControl>
+              </Box>
 
-        <Grid item xs={12} md={4}>
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent className="space-y-3">
-              <Typography variant="subtitle1" className="font-semibold">
-                Refund Summary
-              </Typography>
+              {/* Return Reason */}
+              <Box sx={{ mb: 2.5 }}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label="Return Reason"
+                  value={returnReason}
+                  onChange={(e) => setReturnReason(e.target.value)}
+                  placeholder="Defective, wrong item, customer changed mind..."
+                  size="small"
+                />
+              </Box>
 
+              {/* Customer Debt Alert */}
               {returnType === "credit" && selectedCustomer && (
-                <Alert severity="info" className="text-sm">
-                  Customer: {selectedCustomer.name}
-                  <br />
-                  Current Debt: ${selectedCustomer.currentDebt.toFixed(2)}
-                  <br />
-                  After Refund: ${Math.max(0, selectedCustomer.currentDebt - total).toFixed(2)}
-                </Alert>
+                <Box sx={{ mb: 2.5 }}>
+                  <Alert severity="info" sx={{ fontSize: '0.8rem', py: 0.5 }}>
+                    Customer: {selectedCustomer.name}
+                    <br />
+                    Current Debt: ${selectedCustomer.currentDebt.toFixed(2)}
+                    <br />
+                    After Refund: ${Math.max(0, selectedCustomer.currentDebt - total).toFixed(2)}
+                  </Alert>
+                </Box>
               )}
 
-              <Divider />
+              <Divider sx={{ my: 2.5 }} />
 
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
+              {/* Price Summary - NO TAX */}
+              <Box sx={{ mb: 2.5 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
                   <span>Subtotal</span>
-                  <span className="font-medium">${subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
+                  <Typography sx={{ fontWeight: 500 }}>${subtotal.toFixed(2)}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem', color: '#d32f2f' }}>
                   <span>Tax (15%)</span>
-                  <span className="font-medium">${tax.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-base font-semibold text-red-600">
+                  <Typography sx={{ fontWeight: 500 }}>${tax.toFixed(2)}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: 600, pt: 1, color: '#d32f2f' }}>
                   <span>Total Refund</span>
                   <span>${total.toFixed(2)}</span>
-                </div>
-              </div>
+                </Box>
+              </Box>
 
-              <Divider />
+              <Divider sx={{ my: 2.5 }} />
 
-              <div className="space-y-2">
-                <div className="text-sm">
-                  <span className="text-slate-500">Refund Method:</span>
-                  <span className="font-medium ml-2 capitalize">{refundMethod.replace("_", " ")}</span>
-                </div>
+              {/* Additional Info */}
+              <Box sx={{ mb: 2.5 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, fontSize: '0.875rem' }}>
+                  <span style={{ color: '#666' }}>Refund Method:</span>
+                  <Typography sx={{ fontWeight: 500, textTransform: 'capitalize' }}>
+                    {refundMethod.replace("_", " ")}
+                  </Typography>
+                </Box>
                 {invoiceNumber && (
-                  <div className="text-sm">
-                    <span className="text-slate-500">Original Invoice:</span>
-                    <span className="font-medium ml-2">{invoiceNumber}</span>
-                  </div>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                    <span style={{ color: '#666' }}>Original Invoice:</span>
+                    <Typography sx={{ fontWeight: 500, fontFamily: 'monospace' }}>
+                      {invoiceNumber}
+                    </Typography>
+                  </Box>
                 )}
-              </div>
+              </Box>
 
-              <Button
-                variant="contained"
-                startIcon={<AssignmentReturn />}
-                onClick={() => setShowPreview(true)}
-                disabled={!matchedOrderId || returnItems.length === 0 || createReturnMutation.isLoading}
-                fullWidth
-                color="error"
-              >
-                {createReturnMutation.isLoading ? 'Processing...' : 'Process Return'}
-              </Button>
+              {/* Buttons */}
+              <Box>
+                <Button
+                  variant="contained"
+                  startIcon={<AssignmentReturn />}
+                  onClick={() => setShowPreview(true)}
+                  disabled={!matchedOrderId || returnItems.length === 0 || createReturnMutation.isLoading}
+                  fullWidth
+                  sx={{ 
+                    mb: 1.5,
+                    bgcolor: '#d32f2f',
+                    '&:hover': { bgcolor: '#b71c1c' }
+                  }}
+                >
+                  {createReturnMutation.isLoading ? 'Processing...' : 'Process Return'}
+                </Button>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
+
+        {/* Return Details & Items - RIGHT SIDE (md=7) */}
+        <Grid item xs={12} md={7} sx={{ order: { xs: 1, md: 2 } }}>
+          <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
+                Refundable Items
+              </Typography>
+
+              {/* Instructions / Alerts */}
+              {!matchedOrderId && (
+                <Box sx={{ mb: 2.5 }}>
+                  <Alert severity="info">Enter a valid invoice number to load refundable items.</Alert>
+                </Box>
+              )}
+              {matchedOrderId && fetchingRefundable && (
+                <Box sx={{ mb: 2.5 }}>
+                  <Alert severity="info">Loading items...</Alert>
+                </Box>
+              )}
+              {matchedOrderId && !fetchingRefundable && refundableItems.length === 0 && (
+                <Box sx={{ mb: 2.5 }}>
+                  <Alert severity="warning">No refundable items remaining for this order.</Alert>
+                </Box>
+              )}
+
+              {/* Refundable Items List */}
+              {matchedOrderId && refundableItems.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                    {refundableItems.map(it => (
+                      <Box key={it.product_id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 2, borderRadius: 2, bgcolor: '#f8f9fa', border: '1px solid #e0e0e0' }}>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {it.name}
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+                            Ordered: {it.quantity_ordered} • Available: {it.quantity_available_to_return} • Unit: ${it.unit_price.toFixed(2)}
+                          </Typography>
+                        </Box>
+                        <TextField
+                          type="number"
+                          size="small"
+                          label="Qty"
+                          value={returnQuantities[it.product_id] || ''}
+                          onChange={(e) => updateReturnQty(it.product_id, it.quantity_available_to_return, e.target.value)}
+                          inputProps={{ min: 0, max: it.quantity_available_to_return, style: { width: 70 } }}
+                        />
+                      </Box>
+                    ))}
+                  </div>
+                </Box>
+              )}
+
+              <Divider sx={{ my: 3 }} />
+
+              {/* Selected Return Items */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+                  Selected Return Items
+                </Typography>
+                {returnItems.length === 0 && (
+                  <Typography color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                    No quantities chosen
+                  </Typography>
+                )}
+                {returnItems.map(item => (
+                  <Box key={item.product_id} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 2, borderRadius: 2, bgcolor: '#ffebee', mb: 2, border: '1px solid #ef9a9a' }}>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {item.name}
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+                        {item.returnQty} × ${item.price.toFixed(2)} = ${(item.returnQty * item.price).toFixed(2)}
+                      </Typography>
+                    </Box>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => setReturnQuantities(prev => ({ ...prev, [item.product_id]: 0 }))}
+                    >
+                      <Delete fontSize="small" />
+                    </IconButton>
+                  </Box>
+                ))}
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
       </Grid>
+
+      {/* Recent Returns Table - FULL WIDTH */}
+      <Box sx={{ mt: 4 }}>
+        <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
+              Recent Returns
+            </Typography>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Invoice</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Customer</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Refund Method</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Total</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {returns
+                  .slice(-10)
+                  .reverse()
+                  .map((r) => (
+                    <TableRow key={r.id} hover>
+                      <TableCell>
+                        <Chip label={r.type} size="small" color={r.type === "credit" ? "warning" : "default"} />
+                      </TableCell>
+                      <TableCell>{new Date(r.createdAt).toLocaleDateString()}</TableCell>
+                      <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                        {r.originalInvoice || 'N/A'}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: '0.875rem' }}>
+                        {r.customer?.name || 'Walk-in'}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: '0.875rem', textTransform: 'capitalize' }}>
+                        {r.refundMethod?.replace('_', ' ') || 'Cash'}
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: '#d32f2f' }}>
+                        ${(r.refund_amount ?? r.total ?? 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={r.status} size="small" color="success" />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                {returns.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} sx={{ textAlign: 'center', color: 'text.secondary', py: 4 }}>
+                      No returns yet
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </Box>
 
       {/* Preview Dialog */}
       <Dialog open={showPreview} onClose={() => setShowPreview(false)} maxWidth="md" fullWidth>

@@ -6,16 +6,20 @@ const { authorize } = require('../middleware/role.middleware');
 
 const router = express.Router();
 
-// router.get('/', userController.getUsers);      // GET to /api/users
-router.post('/', userController.createUser);    // POST to /api/users
+// Admin routes - User management
+router.get('/', protect, authorize('Admin'), userController.getUsers);
+router.post('/', protect, authorize('Admin'), userController.createUser);
+router.put('/:id', protect, authorize('Admin'), userController.updateUser);
+router.delete('/:id', protect, authorize('Admin'), userController.deleteUser);
 
-// PUT /api/users/me/location - Update logged-in user's active location
+// User profile routes
+router.get('/:id', protect, userController.getUserById);
 router.put('/me/location', protect, userController.updateMyLocation);
-
-// PUT /api/users/me/profile - Update logged-in user's profile information
 router.put('/me/profile', protect, userController.updateMyProfile);
 
-router.get('/:id', protect, userController.getUserById);
-router.get('/', protect, authorize('Admin'), userController.getUsers);
+// Password change with email verification
+router.post('/me/password/request-code', protect, userController.requestPasswordChangeCode);
+router.post('/me/password/verify-code', protect, userController.verifyPasswordChangeCode);
+router.put('/me/password/change', protect, userController.changePassword);
 
 module.exports = router;

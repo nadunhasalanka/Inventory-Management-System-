@@ -28,6 +28,8 @@ import {
   Tab,
   Box,
   Switch,
+  Pagination,
+  CircularProgress,
 } from "@mui/material"
 import {
   History,
@@ -37,9 +39,21 @@ import {
   QrCodeScanner,
   Inventory as InventoryIcon,
 } from "@mui/icons-material"
-import { stockTransferService } from "../services/inventory"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { fetchInventorySummary, fetchLocations, createLocation, fetchProductStockDistribution, updateProduct } from "../services/inventoryApi"
+import { 
+  fetchInventorySummary, 
+  fetchLocations, 
+  createLocation, 
+  fetchProductStockDistribution, 
+  updateProduct,
+  fetchAdjustments,
+  createAdjustment,
+  fetchTransfers,
+  createTransfer,
+  completeTransfer,
+  cancelTransfer,
+  fetchBatches
+} from "../services/inventoryApi"
 import api from "../utils/api"
 import ReorderAlerts from "../components/ReorderAlerts"
 import BarcodeScanner from "../components/BarcodeScanner"
@@ -54,8 +68,13 @@ export default function Inventory() {
   const [showScanner, setShowScanner] = useState(false)
   const [activeTab, setActiveTab] = useState(0)
   const [items, setItems] = useState([])
-  const [adjustments, setAdjustments] = useState([]) // kept for UI; will not be persisted server-side list here
-  const [transfers, setTransfers] = useState([]) // local transfers until backend route exists
+  
+  // Pagination states for each tab
+  const [adjustPage, setAdjustPage] = useState(1)
+  const [transferPage, setTransferPage] = useState(1)
+  const [batchPage, setBatchPage] = useState(1)
+  const [expiringOnly, setExpiringOnly] = useState(false)
+  
   const [distributionDialogOpen, setDistributionDialogOpen] = useState(false)
   const [distributionLoading, setDistributionLoading] = useState(false)
   const [distribution, setDistribution] = useState(null) // { product, total_quantity, locations:[] }
@@ -91,6 +110,27 @@ export default function Inventory() {
     queryFn: fetchLocations,
   })
 
+  // Stock Adjustments from backend with pagination
+  const { data: adjustmentsData, isLoading: loadingAdjustments, refetch: refetchAdjustments } = useQuery({
+    queryKey: ["adjustments", adjustPage],
+    queryFn: () => fetchAdjustments({ page: adjustPage, limit: 10 }),
+    enabled: activeTab === 1
+  })
+
+  // Stock Transfers from backend with pagination
+  const { data: transfersData, isLoading: loadingTransfers, refetch: refetchTransfers } = useQuery({
+    queryKey: ["transfers", transferPage],
+    queryFn: () => fetchTransfers({ page: transferPage, limit: 10 }),
+    enabled: activeTab === 2
+  })
+
+  // Batches from backend with pagination
+  const { data: batchesData, isLoading: loadingBatches } = useQuery({
+    queryKey: ["batches", batchPage, expiringOnly],
+    queryFn: () => fetchBatches({ page: batchPage, limit: 10, expiring_soon: expiringOnly }),
+    enabled: activeTab === 3
+  })
+
   const createLocationMutation = useMutation({
     mutationFn: createLocation,
     onSuccess: () => {
@@ -113,6 +153,7 @@ export default function Inventory() {
     reason: "correction",
     notes: "",
     reference: "",
+    locationId: "",
   })
 
   const [transferForm, setTransferForm] = useState({
@@ -217,72 +258,120 @@ export default function Inventory() {
     }
 
     try {
-      // Need a location to adjust against; use from transferForm.fromLocation default or prompt in form
-      const locationId = (locationsData.find(l => l.name === transferForm.fromLocation)?._id) || locationsData[0]?._id
+      // Get location from form or use first available location
+      const locationId = adjustmentForm.locationId || locationsData[0]?._id
       if (!locationId) {
         alert("No locations available. Please add a location first.")
         return
       }
+      
       // Fetch current stock for that product/location to compute new absolute quantity
       const productResp = await api.get(`/products/${adjustmentForm.itemId}`)
       const stockLevels = productResp?.data?.data?.stock_levels || []
       const currentForLoc = stockLevels.find(s => s.location_id?._id === locationId)?.current_quantity || 0
       const newQuantity = currentForLoc + Number(adjustmentForm.quantity)
+      
       if (newQuantity < 0) {
         alert("Resulting quantity cannot be negative")
         return
       }
-      await api.post('/inventory/adjust', {
+      
+      await createAdjustment({
         product_id: adjustmentForm.itemId,
         location_id: locationId,
         new_quantity: newQuantity,
       })
-      // Refresh inventory summary after adjustment
+      
+      // Refresh data
       queryClient.invalidateQueries({ queryKey: ["inventory","summary"] })
+      refetchAdjustments()
+      
       setShowAdjustment(false)
+      setAdjustmentForm({
+        itemId: "",
+        quantity: 0,
+        reason: "correction",
+        notes: "",
+        reference: "",
+        locationId: ""
+      })
+      
+      alert("Stock adjustment recorded successfully!")
     } catch (e) {
       alert(e?.response?.data?.message || 'Failed to record adjustment')
     }
-    setAdjustmentForm({
-      itemId: "",
-      quantity: 0,
-      reason: "correction",
-      notes: "",
-      reference: "",
-    })
   }
 
   const handleTransferChange = (field, value) => {
     setTransferForm((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleSubmitTransfer = () => {
+  const handleSubmitTransfer = async () => {
     if (!transferForm.itemId || transferForm.quantity <= 0 || !transferForm.toLocation) {
       alert("Please fill in all required fields")
       return
     }
 
-    stockTransferService.create(transferForm)
-    loadData()
-    setShowTransfer(false)
-    setTransferForm({
-      itemId: "",
-      quantity: 0,
-      fromLocation: "Main Warehouse",
-      toLocation: "",
-      notes: "",
-      expectedDate: "",
-    })
+    try {
+      const fromLoc = locationsData.find(l => l.name === transferForm.fromLocation)
+      const toLoc = locationsData.find(l => l.name === transferForm.toLocation)
+      
+      if (!fromLoc || !toLoc) {
+        alert("Invalid locations selected")
+        return
+      }
+
+      await createTransfer({
+        product_id: transferForm.itemId,
+        from_location_id: fromLoc._id,
+        to_location_id: toLoc._id,
+        quantity: transferForm.quantity,
+        expected_date: transferForm.expectedDate || undefined,
+        notes: transferForm.notes
+      })
+
+      refetchTransfers()
+      queryClient.invalidateQueries({ queryKey: ["inventory","summary"] })
+      
+      setShowTransfer(false)
+      setTransferForm({
+        itemId: "",
+        quantity: 0,
+        fromLocation: "Main Warehouse",
+        toLocation: "",
+        notes: "",
+        expectedDate: "",
+      })
+      
+      alert("Stock transfer created successfully!")
+    } catch (e) {
+      alert(e?.response?.data?.message || 'Failed to create transfer')
+    }
   }
 
-  const handleCompleteTransfer = (transferId) => {
-    stockTransferService.update(transferId, { status: "completed", completedAt: new Date().toISOString() })
-    loadData()
+  const handleCompleteTransfer = async (transferId) => {
+    if (!confirm("Complete this transfer? Stock will be moved between locations.")) return
+    
+    try {
+      await completeTransfer(transferId)
+      refetchTransfers()
+      queryClient.invalidateQueries({ queryKey: ["inventory","summary"] })
+      alert("Transfer completed successfully!")
+    } catch (e) {
+      alert(e?.response?.data?.message || 'Failed to complete transfer')
+    }
   }
 
-  const handleCancelTransfer = (transferId) => {
-    stockTransferService.update(transferId, { status: "cancelled", cancelledAt: new Date().toISOString() })
-    loadData()
+  const handleCancelTransfer = async (transferId) => {
+    if (!confirm("Cancel this transfer?")) return
+    
+    try {
+      await cancelTransfer(transferId)
+      refetchTransfers()
+      alert("Transfer cancelled")
+    } catch (e) {
+      alert(e?.response?.data?.message || 'Failed to cancel transfer')
+    }
   }
 
   const handleItemFound = (item) => {
@@ -370,12 +459,37 @@ export default function Inventory() {
       <ReorderAlerts />
 
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
-        <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)}>
-          <Tab label="Inventory Items" />
-          <Tab label="Stock Adjustments" icon={<History />} iconPosition="start" />
-          <Tab label="Stock Transfers" icon={<SwapHoriz />} iconPosition="start" />
-          <Tab label="Batch Tracking" icon={<InventoryIcon />} iconPosition="start" />
-        </Tabs>
+        <div className="flex justify-between items-center">
+          <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)}>
+            <Tab label="Inventory Items" />
+            <Tab label="Stock Adjustments" icon={<History />} iconPosition="start" />
+            <Tab label="Stock Transfers" icon={<SwapHoriz />} iconPosition="start" />
+            <Tab label="Batch Tracking" icon={<InventoryIcon />} iconPosition="start" />
+          </Tabs>
+          
+          <div className="flex gap-2 mb-2">
+            {activeTab === 1 && (
+              <Button 
+                variant="contained" 
+                size="small" 
+                startIcon={<History />}
+                onClick={() => setShowAdjustment(true)}
+              >
+                New Adjustment
+              </Button>
+            )}
+            {activeTab === 2 && (
+              <Button 
+                variant="contained" 
+                size="small" 
+                startIcon={<SwapHoriz />}
+                onClick={() => setShowTransfer(true)}
+              >
+                New Transfer
+              </Button>
+            )}
+          </div>
+        </div>
       </Box>
 
       {activeTab === 0 && (
@@ -466,48 +580,67 @@ export default function Inventory() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Adjustment #</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>Item</TableCell>
-                <TableCell align="right">Quantity</TableCell>
-                <TableCell>Reason</TableCell>
-                <TableCell>Reference</TableCell>
-                <TableCell>Notes</TableCell>
+                <TableCell sx={{ py: 1.5 }}>Date</TableCell>
+                <TableCell sx={{ py: 1.5 }}>Product</TableCell>
+                <TableCell sx={{ py: 1.5 }}>Location</TableCell>
+                <TableCell align="right" sx={{ py: 1.5 }}>Quantity Change</TableCell>
+                <TableCell align="right" sx={{ py: 1.5 }}>Balance After</TableCell>
+                <TableCell sx={{ py: 1.5 }}>Adjusted By</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {adjustments.length === 0 ? (
+              {loadingAdjustments ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" className="py-8 text-slate-500">
+                  <TableCell colSpan={6} align="center" className="py-8">
+                    <CircularProgress size={24} />
+                  </TableCell>
+                </TableRow>
+              ) : !adjustmentsData?.data || adjustmentsData.data.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" className="py-8 text-slate-500">
                     No stock adjustments recorded yet
                   </TableCell>
                 </TableRow>
               ) : (
-                adjustments.map((adj) => {
-                  const item = items.find((i) => i.id === adj.itemId)
-                  return (
-                    <TableRow key={adj.id} hover>
-                      <TableCell className="font-mono text-sm">{adj.adjustmentNumber}</TableCell>
-                      <TableCell>{new Date(adj.createdAt).toLocaleDateString()}</TableCell>
-                      <TableCell className="font-medium">{item?.name || "Unknown Item"}</TableCell>
-                      <TableCell align="right">
-                        <Chip
-                          label={adj.quantity > 0 ? `+${adj.quantity}` : adj.quantity}
-                          color={adj.quantity > 0 ? "success" : "error"}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={getReasonLabel(adj.reason)} color={getReasonColor(adj.reason)} size="small" />
-                      </TableCell>
-                      <TableCell className="text-sm">{adj.reference || "-"}</TableCell>
-                      <TableCell className="text-sm text-slate-600">{adj.notes || "-"}</TableCell>
-                    </TableRow>
-                  )
-                })
+                adjustmentsData.data.map((adj) => (
+                  <TableRow key={adj._id} hover>
+                    <TableCell sx={{ py: 1.5 }}>{new Date(adj.timestamp).toLocaleString()}</TableCell>
+                    <TableCell sx={{ py: 1.5 }} className="font-medium">
+                      {adj.product?.name || "Unknown"} 
+                      <span className="text-xs text-slate-500 ml-2">({adj.product?.sku || "N/A"})</span>
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5 }}>
+                      <Chip label={adj.location?.name || "Unknown"} size="small" variant="outlined" />
+                    </TableCell>
+                    <TableCell align="right" sx={{ py: 1.5 }}>
+                      <Chip
+                        label={adj.quantity_delta > 0 ? `+${adj.quantity_delta}` : adj.quantity_delta}
+                        color={adj.quantity_delta > 0 ? "success" : "error"}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell align="right" sx={{ py: 1.5 }}>
+                      <strong>{adj.balance_after}</strong>
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5 }} className="text-sm text-slate-600">
+                      {adj.user?.name || "System"}
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
+          
+          {adjustmentsData && adjustmentsData.pages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <Pagination 
+                count={adjustmentsData.pages} 
+                page={adjustPage} 
+                onChange={(e, p) => setAdjustPage(p)}
+                color="primary"
+              />
+            </Box>
+          )}
         </Paper>
       )}
 
@@ -516,81 +649,218 @@ export default function Inventory() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Transfer #</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>Item</TableCell>
-                <TableCell align="right">Quantity</TableCell>
-                <TableCell>From</TableCell>
-                <TableCell>To</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Expected</TableCell>
-                <TableCell align="center">Actions</TableCell>
+                <TableCell sx={{ py: 1.5 }}>Transfer #</TableCell>
+                <TableCell sx={{ py: 1.5 }}>Date</TableCell>
+                <TableCell sx={{ py: 1.5 }}>Product</TableCell>
+                <TableCell align="right" sx={{ py: 1.5 }}>Quantity</TableCell>
+                <TableCell sx={{ py: 1.5 }}>From</TableCell>
+                <TableCell sx={{ py: 1.5 }}>To</TableCell>
+                <TableCell sx={{ py: 1.5 }}>Status</TableCell>
+                <TableCell sx={{ py: 1.5 }}>Expected</TableCell>
+                <TableCell align="center" sx={{ py: 1.5 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {transfers.length === 0 ? (
+              {loadingTransfers ? (
+                <TableRow>
+                  <TableCell colSpan={9} align="center" className="py-8">
+                    <CircularProgress size={24} />
+                  </TableCell>
+                </TableRow>
+              ) : !transfersData?.data || transfersData.data.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} align="center" className="py-8 text-slate-500">
                     No stock transfers recorded yet
                   </TableCell>
                 </TableRow>
               ) : (
-                transfers.map((transfer) => {
-                  const item = items.find((i) => i.id === transfer.itemId)
-                  return (
-                    <TableRow key={transfer.id} hover>
-                      <TableCell className="font-mono text-sm">{transfer.transferNumber}</TableCell>
-                      <TableCell>{new Date(transfer.createdAt).toLocaleDateString()}</TableCell>
-                      <TableCell className="font-medium">{item?.name || "Unknown Item"}</TableCell>
-                      <TableCell align="right">
-                        <Chip label={transfer.quantity} color="primary" size="small" />
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={transfer.fromLocation} size="small" variant="outlined" />
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={transfer.toLocation} size="small" variant="outlined" />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={transfer.status.toUpperCase()}
-                          color={getStatusColor(transfer.status)}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {transfer.expectedDate ? new Date(transfer.expectedDate).toLocaleDateString() : "-"}
-                      </TableCell>
-                      <TableCell align="center">
-                        {transfer.status === "pending" && (
-                          <>
-                            <Tooltip title="Complete Transfer">
-                              <IconButton
-                                size="small"
-                                color="success"
-                                onClick={() => handleCompleteTransfer(transfer.id)}
-                              >
-                                <CheckCircle fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Cancel Transfer">
-                              <IconButton size="small" color="error" onClick={() => handleCancelTransfer(transfer.id)}>
-                                <Cancel fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
+                transfersData.data.map((transfer) => (
+                  <TableRow key={transfer._id} hover>
+                    <TableCell sx={{ py: 1.5 }} className="font-mono text-sm">{transfer.transfer_number}</TableCell>
+                    <TableCell sx={{ py: 1.5 }}>{new Date(transfer.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell sx={{ py: 1.5 }} className="font-medium">
+                      {transfer.product_id?.name || "Unknown"}
+                      <span className="text-xs text-slate-500 ml-2">({transfer.product_id?.sku || "N/A"})</span>
+                    </TableCell>
+                    <TableCell align="right" sx={{ py: 1.5 }}>
+                      <Chip label={transfer.quantity} color="primary" size="small" />
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5 }}>
+                      <Chip label={transfer.from_location_id?.name || "Unknown"} size="small" variant="outlined" />
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5 }}>
+                      <Chip label={transfer.to_location_id?.name || "Unknown"} size="small" variant="outlined" />
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5 }}>
+                      <Chip
+                        label={transfer.status.toUpperCase()}
+                        color={getStatusColor(transfer.status)}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5 }} className="text-sm">
+                      {transfer.expected_date ? new Date(transfer.expected_date).toLocaleDateString() : "-"}
+                    </TableCell>
+                    <TableCell align="center" sx={{ py: 1.5 }}>
+                      {(transfer.status === "pending" || transfer.status === "in-transit") && (
+                        <>
+                          <Tooltip title="Complete Transfer">
+                            <IconButton
+                              size="small"
+                              color="success"
+                              onClick={() => handleCompleteTransfer(transfer._id)}
+                            >
+                              <CheckCircle fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Cancel Transfer">
+                            <IconButton size="small" color="error" onClick={() => handleCancelTransfer(transfer._id)}>
+                              <Cancel fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      )}
+                      {transfer.status === "completed" && (
+                        <Chip label="Completed" color="success" size="small" variant="outlined" />
+                      )}
+                      {transfer.status === "cancelled" && (
+                        <Chip label="Cancelled" color="error" size="small" variant="outlined" />
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
+          
+          {transfersData && transfersData.pages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <Pagination 
+                count={transfersData.pages} 
+                page={transferPage} 
+                onChange={(e, p) => setTransferPage(p)}
+                color="primary"
+              />
+            </Box>
+          )}
         </Paper>
       )}
 
-      {activeTab === 3 && <BatchManagement />}
+      {activeTab === 3 && (
+        <>
+          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="flex items-center gap-2">
+              <Switch 
+                checked={expiringOnly}
+                onChange={(e) => {
+                  setExpiringOnly(e.target.checked)
+                  setBatchPage(1)
+                }}
+              />
+              <span className="text-sm text-slate-600">Show Expiring Soon (within 30 days)</span>
+            </div>
+            {batchesData && (
+              <span className="text-sm text-slate-500">
+                Total: {batchesData.total} batches
+              </span>
+            )}
+          </Box>
+          
+          <Paper className="rounded-2xl overflow-hidden">
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ py: 1.5 }}>Batch #</TableCell>
+                  <TableCell sx={{ py: 1.5 }}>Product</TableCell>
+                  <TableCell sx={{ py: 1.5 }}>Location</TableCell>
+                  <TableCell align="right" sx={{ py: 1.5 }}>Quantity</TableCell>
+                  <TableCell align="right" sx={{ py: 1.5 }}>Unit Cost</TableCell>
+                  <TableCell sx={{ py: 1.5 }}>Received Date</TableCell>
+                  <TableCell sx={{ py: 1.5 }}>Expiry Date</TableCell>
+                  <TableCell sx={{ py: 1.5 }}>Supplier</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {loadingBatches ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center" className="py-8">
+                      <CircularProgress size={24} />
+                    </TableCell>
+                  </TableRow>
+                ) : !batchesData?.data || batchesData.data.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center" className="py-8 text-slate-500">
+                      {expiringOnly ? "No batches expiring soon" : "No batches found"}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  batchesData.data.map((batch) => {
+                    const daysUntilExpiry = batch.days_until_expiry ? Math.floor(batch.days_until_expiry) : null
+                    const isExpired = daysUntilExpiry !== null && daysUntilExpiry < 0
+                    const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry >= 0 && daysUntilExpiry <= 30
+                    
+                    return (
+                      <TableRow key={batch._id} hover style={{ backgroundColor: isExpired ? '#fee' : 'inherit' }}>
+                        <TableCell sx={{ py: 1.5 }} className="font-mono text-sm">{batch.batch_number}</TableCell>
+                        <TableCell sx={{ py: 1.5 }} className="font-medium">
+                          {batch.product_name}
+                          <span className="text-xs text-slate-500 ml-2">({batch.product_sku})</span>
+                        </TableCell>
+                        <TableCell sx={{ py: 1.5 }}>
+                          <Chip label={batch.location_name} size="small" variant="outlined" />
+                        </TableCell>
+                        <TableCell align="right" sx={{ py: 1.5 }}>
+                          <strong>{batch.quantity}</strong>
+                        </TableCell>
+                        <TableCell align="right" sx={{ py: 1.5 }}>
+                          Rs {Number(batch.unit_cost || 0).toFixed(2)}
+                        </TableCell>
+                        <TableCell sx={{ py: 1.5 }} className="text-sm">
+                          {new Date(batch.received_date).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell sx={{ py: 1.5 }}>
+                          {batch.expire_date ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm">{new Date(batch.expire_date).toLocaleDateString()}</span>
+                              {daysUntilExpiry !== null && (
+                                <Chip 
+                                  label={
+                                    isExpired 
+                                      ? `Expired ${Math.abs(daysUntilExpiry)}d ago` 
+                                      : `${daysUntilExpiry}d left`
+                                  }
+                                  color={isExpired ? "error" : isExpiringSoon ? "warning" : "success"}
+                                  size="small"
+                                />
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell sx={{ py: 1.5 }} className="text-sm">
+                          {batch.supplier_name || "-"}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+            
+            {batchesData && batchesData.pages > 1 && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                <Pagination 
+                  count={batchesData.pages} 
+                  page={batchPage} 
+                  onChange={(e, p) => setBatchPage(p)}
+                  color="primary"
+                />
+              </Box>
+            )}
+          </Paper>
+        </>
+      )}
 
       <BarcodeScanner open={showScanner} onClose={() => setShowScanner(false)} onItemFound={handleItemFound} />
 
@@ -750,6 +1020,21 @@ export default function Inventory() {
                 {items.map((item) => (
                   <MenuItem key={item.id} value={item.id}>
                     {item.name} ({item.sku}) - Current: {item.currentStock}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel>Location</InputLabel>
+              <Select
+                value={adjustmentForm.locationId}
+                label="Location"
+                onChange={(e) => handleAdjustmentChange("locationId", e.target.value)}
+              >
+                {locationsData.map((loc) => (
+                  <MenuItem key={loc._id} value={loc._id}>
+                    {loc.name} ({loc.type})
                   </MenuItem>
                 ))}
               </Select>

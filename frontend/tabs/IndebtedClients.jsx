@@ -267,12 +267,26 @@ export default function IndebtedClients() {
       }
     >
       {/* Tabs */}
-      <Card className="rounded-2xl shadow-sm mb-4">
+      <Card className="rounded-2xl shadow-sm mb-4" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
         <Tabs 
           value={activeTab} 
           onChange={handleTabChange}
           variant="fullWidth"
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
+          sx={{ 
+            borderBottom: 1, 
+            borderColor: 'divider',
+            '& .MuiTab-root': {
+              fontSize: '0.9rem',
+              fontWeight: 500
+            },
+            '& .Mui-selected': {
+              color: '#4caf50',
+              fontWeight: 600
+            },
+            '& .MuiTabs-indicator': {
+              backgroundColor: '#4caf50'
+            }
+          }}
         >
           <Tab 
             icon={<CreditCardIcon />} 
@@ -288,17 +302,18 @@ export default function IndebtedClients() {
       </Card>
 
       {/* Search Bar */}
-      <Card className="rounded-2xl shadow-sm mb-4">
-        <CardContent>
+      <Card className="rounded-2xl shadow-sm mb-4" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
+        <CardContent sx={{ p: 2.5 }}>
           <TextField
             fullWidth
             placeholder="Search by customer name, email, or phone..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            size="small"
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon />
+                  <SearchIcon sx={{ color: '#4caf50' }} />
                 </InputAdornment>
               ),
             }}
@@ -318,16 +333,15 @@ export default function IndebtedClients() {
           }
         </Alert>
       ) : (
-        <Grid container spacing={2}>
+        <Box>
           {filteredCustomers.map((customerData) => (
-            <Grid item xs={12} key={customerData.customer._id}>
-              <Card className="rounded-2xl shadow-sm">
-                <CardContent>
+            <Card key={customerData.customer._id} className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005', mb: 2 }}>
+              <CardContent sx={{ p: 3 }}>
                   {/* Customer Summary Row */}
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                     <Box sx={{ flex: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                        <Typography variant="h6" className="font-semibold">
+                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#333' }}>
                           {customerData.customer.name}
                         </Typography>
                         <Chip
@@ -335,47 +349,54 @@ export default function IndebtedClients() {
                           label={`${customerData.daysOverdue} days overdue`}
                           color={getStatusColor(customerData.daysOverdue)}
                           size="small"
+                          sx={{ fontWeight: 500 }}
                         />
                       </Box>
                       
-                      <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                      <Grid container spacing={3} sx={{ mt: 0.5 }}>
                         <Grid item xs={12} sm={6} md={3}>
-                          <Typography variant="caption" color="text.secondary">Email</Typography>
-                          <Typography variant="body2">{customerData.customer.email || 'N/A'}</Typography>
+                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Email</Typography>
+                          <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{customerData.customer.email || 'N/A'}</Typography>
                         </Grid>
                         <Grid item xs={12} sm={6} md={3}>
-                          <Typography variant="caption" color="text.secondary">Phone</Typography>
-                          <Typography variant="body2">{customerData.customer.phone || 'N/A'}</Typography>
+                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Phone</Typography>
+                          <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{customerData.customer.phone || 'N/A'}</Typography>
                         </Grid>
                         <Grid item xs={12} sm={6} md={3}>
-                          <Typography variant="caption" color="text.secondary">Total Outstanding</Typography>
-                          <Typography variant="body2" className="font-bold text-red-600">
+                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Total Outstanding</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#d32f2f', fontSize: '0.95rem' }}>
                             ${customerData.totalOutstanding.toFixed(2)}
                           </Typography>
                         </Grid>
                         <Grid item xs={12} sm={6} md={3}>
-                          <Typography variant="caption" color="text.secondary">Overdue Orders</Typography>
-                          <Typography variant="body2">{customerData.ordersCount}</Typography>
+                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Overdue Orders</Typography>
+                          <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 600 }}>{customerData.ordersCount}</Typography>
                         </Grid>
                       </Grid>
                     </Box>
 
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                       <IconButton
-                        color="primary"
                         onClick={() => handleSendEmailReminder(customerData)}
                         title="Send Email Reminder"
                         disabled={emailReminderMutation.isLoading}
+                        sx={{ 
+                          color: '#4caf50',
+                          '&:hover': { bgcolor: '#4caf5010' }
+                        }}
                       >
                         <EmailIcon />
                       </IconButton>
                       <Button
                         variant="contained"
-                        color="primary"
                         startIcon={<PaymentIcon />}
                         onClick={() => handleOpenFullPaymentDialog(customerData)}
                         disabled={isProcessing}
                         size="small"
+                        sx={{
+                          bgcolor: '#4caf50',
+                          '&:hover': { bgcolor: '#45a049' }
+                        }}
                       >
                         Pay All
                       </Button>
@@ -383,7 +404,8 @@ export default function IndebtedClients() {
                         onClick={() => handleExpandCustomer(customerData.customer._id)}
                         sx={{
                           transform: expandedCustomer === customerData.customer._id ? 'rotate(180deg)' : 'rotate(0deg)',
-                          transition: 'transform 0.3s'
+                          transition: 'transform 0.3s',
+                          color: '#4caf50'
                         }}
                       >
                         <ExpandMoreIcon />
@@ -393,12 +415,12 @@ export default function IndebtedClients() {
 
                   {/* Expanded Details */}
                   <Collapse in={expandedCustomer === customerData.customer._id}>
-                    <Divider sx={{ my: 2 }} />
-                    <Typography variant="subtitle2" className="font-semibold mb-2">
+                    <Divider sx={{ my: 2.5 }} />
+                    <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 600, fontSize: '1rem', mb: 2 }}>
                       Overdue Orders
                     </Typography>
                     
-                    <TableContainer component={Paper} variant="outlined">
+                    <TableContainer component={Paper} variant="outlined" sx={{ border: '1px solid #e0e0e0' }}>
                       <Table size="small">
                         <TableHead>
                           <TableRow>
@@ -463,6 +485,14 @@ export default function IndebtedClients() {
                                     variant="outlined"
                                     onClick={() => handleOpenOrderPaymentDialog(customerData, order)}
                                     disabled={isProcessing}
+                                    sx={{
+                                      borderColor: '#4caf5050',
+                                      color: '#4caf50',
+                                      '&:hover': {
+                                        borderColor: '#4caf50',
+                                        bgcolor: '#4caf5010'
+                                      }
+                                    }}
                                   >
                                     Pay
                                   </Button>
@@ -475,33 +505,35 @@ export default function IndebtedClients() {
                     </TableContainer>
 
                     {/* Customer Credit Info */}
-                    <Box sx={{ mt: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
-                      <Grid container spacing={2}>
+                    <Box sx={{ mt: 2.5, p: 2.5, bgcolor: '#f8f9fa', borderRadius: 2, border: '1px solid #e0e0e0' }}>
+                      <Grid container spacing={3}>
                         <Grid item xs={6} sm={3}>
-                          <Typography variant="caption" color="text.secondary">Current Balance</Typography>
-                          <Typography variant="body2" className="font-semibold">
+                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Current Balance</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
                             ${(customerData.customer.current_balance || 0).toFixed(2)}
                           </Typography>
                         </Grid>
                         <Grid item xs={6} sm={3}>
-                          <Typography variant="caption" color="text.secondary">Credit Limit</Typography>
-                          <Typography variant="body2">
+                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Credit Limit</Typography>
+                          <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
                             ${(customerData.customer.credit_limit || 0).toFixed(2)}
                           </Typography>
                         </Grid>
                         <Grid item xs={6} sm={3}>
-                          <Typography variant="caption" color="text.secondary">Available Credit</Typography>
-                          <Typography variant="body2" color={
-                            (customerData.customer.credit_limit - customerData.customer.current_balance) > 0 
-                              ? 'success.main' 
-                              : 'error.main'
-                          }>
+                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Available Credit</Typography>
+                          <Typography variant="body2" sx={{
+                            fontWeight: 600,
+                            fontSize: '0.9rem',
+                            color: (customerData.customer.credit_limit - customerData.customer.current_balance) > 0 
+                              ? '#4caf50' 
+                              : '#d32f2f'
+                          }}>
                             ${Math.max(0, (customerData.customer.credit_limit || 0) - (customerData.customer.current_balance || 0)).toFixed(2)}
                           </Typography>
                         </Grid>
                         <Grid item xs={6} sm={3}>
-                          <Typography variant="caption" color="text.secondary">Oldest Overdue</Typography>
-                          <Typography variant="body2">
+                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Oldest Overdue</Typography>
+                          <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
                             {new Date(customerData.oldestOverdueDate).toLocaleDateString()}
                           </Typography>
                         </Grid>
@@ -510,9 +542,8 @@ export default function IndebtedClients() {
                   </Collapse>
                 </CardContent>
               </Card>
-            </Grid>
           ))}
-        </Grid>
+        </Box>
       )}
 
       {/* Payment Dialog */}

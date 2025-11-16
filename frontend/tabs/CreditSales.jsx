@@ -23,6 +23,7 @@ import {
   FormControl,
   InputLabel,
   Select,
+  Box,
 } from "@mui/material"
 import { ReceiptLong, QrCode2, Add, Delete, Close, Warning, CheckCircle } from "@mui/icons-material"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -206,167 +207,300 @@ export default function CreditSales() {
 
   return (
     <Section title="Credit Sales" breadcrumbs={["Home", "Sales", "Credit"]}>
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={8}>
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Typography variant="subtitle1" className="font-semibold">
-                  Customer Information
-                </Typography>
-                <Button size="small" variant="outlined" startIcon={<Add />} onClick={() => setShowNewCustomer(true)}>
-                  New Customer
-                </Button>
-              </div>
+      <Grid container spacing={4}>
+        
+        {/* Payment Summary - LEFT SIDE (md=4) */}
+        <Grid item xs={12} md={4} sx={{ order: { xs: 2, md: 1 } }}>
+          <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
+                Payment Summary
+              </Typography>
 
-              <div className="flex flex-col gap-5">
-              <Autocomplete
-                options={customers}
-                getOptionLabel={(option) => `${option.name} - ${option.email}`}
-                value={selectedCustomer}
-                onChange={(_, newValue) => setSelectedCustomer(newValue)}
-                inputValue={customerSearch}
-                onInputChange={(_, newInputValue) => setCustomerSearch(newInputValue)}
-                renderInput={(params) => (
-                  <TextField {...params} label="Select Customer" placeholder="Search by name or email" />
-                )}
-                renderOption={(props, option) => (
-                  <li {...props}>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{option.name}</span>
-                      <span className="text-xs text-slate-500">
-                        Debt: ${Number(option.current_balance || 0).toFixed(2)} / ${Number(option.credit_limit || 0).toFixed(2)}
-                      </span>
-                    </div>
-                  </li>
-                )}
-              />
+              {/* Customer Selection */}
+              <Box sx={{ mb: 2.5 }}>
+                <Autocomplete
+                  options={customers}
+                  getOptionLabel={(option) => `${option.name} - ${option.email}`}
+                  value={selectedCustomer}
+                  onChange={(_, newValue) => setSelectedCustomer(newValue)}
+                  inputValue={customerSearch}
+                  onInputChange={(_, newInputValue) => setCustomerSearch(newInputValue)}
+                  size="small"
+                  renderInput={(params) => (
+                    <TextField {...params} label="Select Customer" placeholder="Search by name or email" />
+                  )}
+                  renderOption={(props, option) => (
+                    <li {...props}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{option.name}</span>
+                        <span className="text-xs text-slate-500">
+                          Debt: ${Number(option.current_balance || 0).toFixed(2)} / ${Number(option.credit_limit || 0).toFixed(2)}
+                        </span>
+                      </div>
+                    </li>
+                  )}
+                />
+              </Box>
 
               {/* Location selection */}
-              <FormControl fullWidth sx={{ mt: 1 }}>
-                <InputLabel>Location</InputLabel>
-                <Select value={selectedLocationId} label="Location" onChange={(e) => setSelectedLocationId(e.target.value)}>
-                  {locations.map((l) => (
-                    <MenuItem key={l._id} value={l._id}>
-                      {l.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-1">
-                <TextField
-                  type="date"
-                  label="Due Date"
-                  name="dueDate"
-                  value={invoiceDetails.dueDate}
-                  onChange={handleInvoiceChange}
-                  InputLabelProps={{ shrink: true }}
-                  fullWidth
-                />
-                <TextField
-                  label="Allowed Delay (days)"
-                  name="allowedDelay"
-                  type="number"
-                  value={invoiceDetails.allowedDelay}
-                  onChange={handleInvoiceChange}
-                  fullWidth
-                />
-              </div>
+              <Box sx={{ mb: 2.5 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Location</InputLabel>
+                  <Select value={selectedLocationId} label="Location" onChange={(e) => setSelectedLocationId(e.target.value)}>
+                    {locations.map((l) => (
+                      <MenuItem key={l._id} value={l._id}>
+                        {l.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+
+              {/* Due Date and Allowed Delay */}
+              <Box sx={{ mb: 2.5 }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                  <TextField
+                    type="date"
+                    label="Due Date"
+                    name="dueDate"
+                    value={invoiceDetails.dueDate}
+                    onChange={handleInvoiceChange}
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                    size="small"
+                  />
+                  <TextField
+                    label="Delay (days)"
+                    name="allowedDelay"
+                    type="number"
+                    value={invoiceDetails.allowedDelay}
+                    onChange={handleInvoiceChange}
+                    fullWidth
+                    size="small"
+                  />
+                </Box>
+              </Box>
 
               {/* Display calculated allowed_until date */}
               {invoiceDetails.dueDate && invoiceDetails.allowedDelay > 0 && (
-                <Alert severity="info" icon={<CheckCircle />} sx={{ mt: 2 }}>
-                  Final payment deadline (Due Date + Delay): {' '}
-                  <strong>
-                    {(() => {
-                      const allowedUntil = new Date(invoiceDetails.dueDate)
-                      allowedUntil.setDate(allowedUntil.getDate() + Number(invoiceDetails.allowedDelay))
-                      return allowedUntil.toLocaleDateString()
-                    })()}
-                  </strong>
-                </Alert>
+                <Box sx={{ mb: 2.5 }}>
+                  <Alert severity="info" icon={<CheckCircle />} sx={{ fontSize: '0.8rem', py: 0.5 }}>
+                    Deadline: {' '}
+                    <strong>
+                      {(() => {
+                        const allowedUntil = new Date(invoiceDetails.dueDate)
+                        allowedUntil.setDate(allowedUntil.getDate() + Number(invoiceDetails.allowedDelay))
+                        return allowedUntil.toLocaleDateString()
+                      })()}
+                    </strong>
+                  </Alert>
+                </Box>
               )}
-              </div>
 
+              {/* Customer Debt Alert */}
               {selectedCustomer && (
-                <Alert
-                  severity={currentDebt > maxDebt * 0.8 ? "warning" : "info"}
-                  icon={currentDebt > maxDebt * 0.8 ? <Warning /> : <CheckCircle />}
-                >
-                  Current debt: ${currentDebt.toFixed(2)} of ${maxDebt.toFixed(2)}{" "}
-                  limit
-                </Alert>
+                <Box sx={{ mb: 2.5 }}>
+                  <Alert
+                    severity={currentDebt > maxDebt * 0.8 ? "warning" : "info"}
+                    icon={currentDebt > maxDebt * 0.8 ? <Warning /> : <CheckCircle />}
+                    sx={{ fontSize: '0.8rem', py: 0.5 }}
+                  >
+                    Debt: ${currentDebt.toFixed(2)} / ${maxDebt.toFixed(2)}
+                  </Alert>
+                </Box>
               )}
 
-              {/* Moved Due Date & Allowed Delay inputs into grouped section above with spacing */}
-
-              <div className="flex gap-2">
-                <TextField
-                  select
-                  label="Discount Type"
-                  value={discount.type}
-                  onChange={(e) => setDiscount((prev) => ({ ...prev, type: e.target.value }))}
-                  className="w-32"
-                  size="small"
-                >
-                  <MenuItem value="percentage">%</MenuItem>
-                  <MenuItem value="fixed">$</MenuItem>
-                </TextField>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="Discount"
-                  value={discount.value}
-                  onChange={(e) => setDiscount((prev) => ({ ...prev, value: Number.parseFloat(e.target.value) || 0 }))}
-                  inputProps={{ min: 0, step: 0.01 }}
-                  size="small"
-                />
-              </div>
-
-              <Divider />
-
-              <div className="flex items-center justify-between">
-                <Typography variant="subtitle1" className="font-semibold">
-                  Items
-                </Typography>
-                <SearchInput placeholder="Search products" value={query} onChange={setQuery} />
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-[300px] overflow-y-auto p-2">
-                {pool.slice(0, 16).map((p) => (
-                  <Button
-                    key={p.sku}
-                    variant="outlined"
-                    onClick={() => addToCart(p)}
-                    className="justify-between flex-col items-start h-auto py-2"
+              {/* Discount */}
+              <Box sx={{ mb: 2.5 }}>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  <TextField
+                    select
+                    label="Discount Type"
+                    value={discount.type}
+                    onChange={(e) => setDiscount((prev) => ({ ...prev, type: e.target.value }))}
+                    sx={{ width: 120 }}
                     size="small"
                   >
-                    <span className="truncate text-left w-full text-xs">{p.name}</span>
-                    <span className="font-semibold">${Number(p.selling_price ?? p.price ?? 0).toFixed(2)}</span>
-                  </Button>
-                ))}
-              </div>
+                    <MenuItem value="percentage">%</MenuItem>
+                    <MenuItem value="fixed">$</MenuItem>
+                  </TextField>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Discount"
+                    value={discount.value}
+                    onChange={(e) => setDiscount((prev) => ({ ...prev, value: Number.parseFloat(e.target.value) || 0 }))}
+                    inputProps={{ min: 0, step: 0.01 }}
+                    size="small"
+                  />
+                </Box>
+              </Box>
 
-              <Divider />
+              <Divider sx={{ my: 2.5 }} />
 
-              <div className="space-y-2">
-                <Typography variant="subtitle2" className="font-semibold">
+              {/* Balance & Terms Section */}
+              {selectedCustomer && (
+                <>
+                  <Box sx={{ mb: 2.5 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
+                      <span>Current Debt</span>
+                      <Typography sx={{ fontWeight: 600 }}>${currentDebt.toFixed(2)}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem', color: '#4caf50' }}>
+                      <span>New Sale</span>
+                      <Typography sx={{ fontWeight: 600 }}>+${total.toFixed(2)}</Typography>
+                    </Box>
+                    <Divider sx={{ my: 1.5 }} />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography sx={{ fontWeight: 600 }}>New Total Debt</Typography>
+                      <Typography sx={{ fontWeight: 700, color: !canProceed ? '#d32f2f' : 'inherit' }}>
+                        ${newDebt.toFixed(2)}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: 'text.secondary' }}>
+                      <span>Credit Limit</span>
+                      <span>${maxDebt.toFixed(2)}</span>
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ mb: 2.5 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'text.secondary', mb: 1 }}>
+                      <span>Credit Usage</span>
+                      <span>{debtPercentage.toFixed(0)}%</span>
+                    </Box>
+                    <LinearProgress
+                      variant="determinate"
+                      value={Math.min(debtPercentage, 100)}
+                      color={debtPercentage > 100 ? "error" : debtPercentage > 80 ? "warning" : "primary"}
+                      sx={{ height: 8, borderRadius: 1 }}
+                    />
+                  </Box>
+
+                  {!canProceed && (
+                    <Box sx={{ mb: 2.5 }}>
+                      <Alert severity="error" sx={{ fontSize: '0.875rem' }}>
+                        Credit limit exceeded! Cannot proceed with this sale.
+                      </Alert>
+                    </Box>
+                  )}
+
+                  <Divider sx={{ my: 2.5 }} />
+                </>
+              )}
+
+              {/* Price Summary - NO TAX */}
+              <Box sx={{ mb: 2.5 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
+                  <span>Subtotal</span>
+                  <Typography sx={{ fontWeight: 500 }}>${subtotal.toFixed(2)}</Typography>
+                </Box>
+                {discountAmount > 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem', color: '#4caf50' }}>
+                    <span>Discount ({discount.type === "percentage" ? `${discount.value}%` : "$"})</span>
+                    <Typography sx={{ fontWeight: 500 }}>-${discountAmount.toFixed(2)}</Typography>
+                  </Box>
+                )}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: 600, pt: 1 }}>
+                  <span>Total</span>
+                  <span>${total.toFixed(2)}</span>
+                </Box>
+              </Box>
+
+              {/* Buttons */}
+              <Box>
+                <Button
+                  variant="contained"
+                  startIcon={<ReceiptLong />}
+                  onClick={handleGenerateInvoice}
+                  disabled={
+                    !selectedCustomer || cart.length === 0 || !canProceed || !invoiceDetails.dueDate || isProcessing
+                  }
+                  fullWidth
+                  sx={{ 
+                    mb: 1.5,
+                    bgcolor: '#4caf50',
+                    '&:hover': { bgcolor: '#45a049' }
+                  }}
+                >
+                  {isProcessing ? "Processing..." : "Create Credit Invoice"}
+                </Button>
+                <Button 
+                  variant="outlined" 
+                  startIcon={<QrCode2 />} 
+                  disabled 
+                  size="small"
+                  fullWidth
+                  sx={{ borderColor: '#4caf5050', color: '#4caf50' }}
+                >
+                  Preview Invoice
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Select Items - RIGHT SIDE (md=8) */}
+        <Grid item xs={12} md={8} sx={{ order: { xs: 1, md: 2 } }}>
+          <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
+                Select Items
+              </Typography>
+
+              {/* Search Bar */}
+              <Box sx={{ mb: 2 }}>
+                <SearchInput placeholder="Search products" value={query} onChange={setQuery} />
+              </Box>
+
+              {/* Product Grid */}
+              <Box sx={{ mb: 3 }}>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-[300px] overflow-y-auto p-2">
+                  {pool.slice(0, 16).map((p) => (
+                    <Button
+                      key={p.sku}
+                      variant="outlined"
+                      onClick={() => addToCart(p)}
+                      className="justify-between flex-col items-start h-auto py-2"
+                      size="small"
+                      sx={{
+                        borderColor: '#4caf5050',
+                        '&:hover': {
+                          borderColor: '#4caf50',
+                          bgcolor: '#4caf5010'
+                        }
+                      }}
+                    >
+                      <span className="truncate text-left w-full text-xs">{p.name}</span>
+                      <span className="font-semibold">${Number(p.selling_price ?? p.price ?? 0).toFixed(2)}</span>
+                    </Button>
+                  ))}
+                </div>
+              </Box>
+
+              <Divider sx={{ my: 3 }} />
+
+              {/* Cart Items */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
                   Cart Items
                 </Typography>
                 {cart.length === 0 && (
-                  <Typography color="text.secondary" className="text-sm">
+                  <Typography color="text.secondary" sx={{ fontSize: '0.875rem' }}>
                     No items added yet
                   </Typography>
                 )}
                 {cart.map((c) => (
-                  <div key={c.sku} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-50">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium text-sm">{c.name}</div>
-                      <div className="text-xs text-slate-500">
+                  <Box key={c.sku} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 2, borderRadius: 2, bgcolor: '#f8f9fa', mb: 2 }}>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {c.name}
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
                         {c.qty} × ${c.price.toFixed(2)} = ${(c.qty * c.price).toFixed(2)}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <IconButton
                         size="small"
                         onClick={() =>
@@ -377,7 +511,7 @@ export default function CreditSales() {
                       >
                         -
                       </IconButton>
-                      <span className="text-sm font-medium w-6 text-center">{c.qty}</span>
+                      <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, minWidth: 24, textAlign: 'center' }}>{c.qty}</Typography>
                       <IconButton
                         size="small"
                         onClick={() =>
@@ -393,107 +527,14 @@ export default function CreditSales() {
                       >
                         <Delete fontSize="small" />
                       </IconButton>
-                    </div>
-                  </div>
+                    </Box>
+                  </Box>
                 ))}
-              </div>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={4}>
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent className="space-y-3">
-              <Typography variant="subtitle1" className="font-semibold">
-                Balance & Terms
-              </Typography>
-
-              {selectedCustomer && (
-                <>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Current Debt</span>
-                      <span className="font-semibold">${currentDebt.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>New Sale</span>
-                      <span className="font-semibold text-green-600">+${total.toFixed(2)}</span>
-                    </div>
-                    <Divider />
-                    <div className="flex justify-between">
-                      <span className="font-semibold">New Total Debt</span>
-                      <span className={`font-bold ${!canProceed ? "text-red-600" : "text-slate-900"}`}>
-                        ${newDebt.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm text-slate-500">
-                      <span>Credit Limit</span>
-                      <span>${maxDebt.toFixed(2)}</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs text-slate-500 mb-1">
-                      <span>Credit Usage</span>
-                      <span>{debtPercentage.toFixed(0)}%</span>
-                    </div>
-                    <LinearProgress
-                      variant="determinate"
-                      value={Math.min(debtPercentage, 100)}
-                      color={debtPercentage > 100 ? "error" : debtPercentage > 80 ? "warning" : "primary"}
-                      className="h-2 rounded"
-                    />
-                  </div>
-
-                  {!canProceed && (
-                    <Alert severity="error" className="text-sm">
-                      Credit limit exceeded! Cannot proceed with this sale.
-                    </Alert>
-                  )}
-
-                  {/* Display of next due could be added if backend provides it */}
-                </>
-              )}
-
-              <Divider />
-
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span className="font-medium">${subtotal.toFixed(2)}</span>
-                </div>
-                {discountAmount > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount ({discount.type === "percentage" ? `${discount.value}%` : "$"})</span>
-                    <span className="font-medium">-${discountAmount.toFixed(2)}</span>
-                  </div>
-                )}
-                {/* Tax removed per requirements */}
-                <div className="flex justify-between text-base font-semibold">
-                  <span>Total</span>
-                  <span>${total.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Button
-                  variant="contained"
-                  startIcon={<ReceiptLong />}
-                  onClick={handleGenerateInvoice}
-                  disabled={
-                    !selectedCustomer || cart.length === 0 || !canProceed || !invoiceDetails.dueDate || isProcessing
-                  }
-                  fullWidth
-                >
-                  {isProcessing ? "Processing..." : "Create Credit Invoice"}
-                </Button>
-                <Button variant="outlined" startIcon={<QrCode2 />} disabled size="small">
-                  Preview Invoice
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </Grid>
       </Grid>
 
       <Dialog open={showNewCustomer} onClose={() => setShowNewCustomer(false)} maxWidth="sm" fullWidth>

@@ -31,6 +31,16 @@ const LineItemSnapshotSchema = new mongoose.Schema({
         type: Number,
         required: true,
         min: [0, 'Total price cannot be negative']
+    },
+    variant_info: {
+        type: {
+            name: { type: String, trim: true },        // e.g., "Size", "Color"
+            value: { type: String, trim: true },       // e.g., "Large", "Red"
+            sku_suffix: { type: String, trim: true },  // e.g., "-LG", "-RD"
+            additional_price: { type: Number, default: 0 }
+        },
+        required: false,
+        default: null
     }
 });
 

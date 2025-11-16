@@ -1,15 +1,17 @@
 // Roles and their permissions for the front-end demo
+// These must match the backend User model roles exactly
 
 export const ROLES = {
-  ADMIN: "admin",
-  WAREHOUSE_MANAGER: "warehouse_manager",
-  STAFF: "staff",
+  ADMIN: "Admin",
+  MANAGER: "Manager",
+  WAREHOUSE_STAFF: "WarehouseStaff",
+  STAFF: "Staff",
 }
 
 // Flattened permission strings consumed by hasPermission and tabPermissions
 export const rolePermissions = {
-  [ROLES.ADMIN]: ["all"],
-  [ROLES.WAREHOUSE_MANAGER]: [
+  [ROLES.ADMIN]: ["all"], // Admin has access to everything including user management
+  [ROLES.MANAGER]: [
     "view_dashboard",
     "view_inventory",
     "edit_inventory",
@@ -18,6 +20,14 @@ export const rolePermissions = {
     "view_reports",
     "view_quotations",
     "view_customers",
+    "create_sales",
+  ],
+  [ROLES.WAREHOUSE_STAFF]: [
+    "view_dashboard",
+    "view_inventory",
+    "edit_inventory",
+    "view_suppliers",
+    "view_reports",
   ],
   [ROLES.STAFF]: [
     "view_dashboard",

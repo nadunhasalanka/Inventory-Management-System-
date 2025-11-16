@@ -46,10 +46,27 @@ exports.processCheckout = asyncHandler(async (req, res, next) => {
             const correct_unit_price = product.selling_price;
             const correct_total_price = correct_unit_price * item.quantity;
             
-            validated_line_items.push({
-                product_id: product._id, sku: product.sku, name: product.name,
-                quantity: item.quantity, unit_price: correct_unit_price, total_price: correct_total_price
-            });
+            // Build line item with variant info if present
+            const lineItem = {
+                product_id: product._id, 
+                sku: product.sku, 
+                name: product.name,
+                quantity: item.quantity, 
+                unit_price: correct_unit_price, 
+                total_price: correct_total_price
+            };
+
+            // Add variant information if provided
+            if (item.variant_info) {
+                lineItem.variant_info = {
+                    name: item.variant_info.name,
+                    value: item.variant_info.value,
+                    sku_suffix: item.variant_info.sku_suffix || '',
+                    additional_price: item.variant_info.additional_price || 0
+                };
+            }
+
+            validated_line_items.push(lineItem);
             calculated_grand_total += correct_total_price;
         }
 

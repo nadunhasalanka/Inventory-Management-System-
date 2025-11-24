@@ -27,7 +27,8 @@ import {
 } from "@mui/material"
 import { ReceiptLong, QrCode2, Add, Delete, Close, Warning, CheckCircle } from "@mui/icons-material"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { fetchProducts } from "../services/productApi"
+// Using high-stock inventory (only items with aggregated stock > threshold)
+import { fetchHighStockInventory } from "../services/inventoryApi"
 import { fetchCustomers, createCustomer } from "../services/customersApi"
 import { fetchLocations } from "../services/inventoryApi"
 import { processCheckout } from "../services/salesApi"
@@ -56,16 +57,14 @@ export default function CreditSales() {
   const [invoiceData, setInvoiceData] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [selectedLocationId, setSelectedLocationId] = useState("")
-  const [showVariantDialog, setShowVariantDialog] = useState(false)
-  const [selectedProductForVariant, setSelectedProductForVariant] = useState(null)
-  const [selectedVariant, setSelectedVariant] = useState(null)
   const queryClient = useQueryClient()
   const { currentUser } = useCurrentUser()
 
-  // Fetch products (cached)
-  const { data: products = [], isLoading: loadingProducts } = useQuery({
-    queryKey: ["products"],
-    queryFn: () => fetchProducts(),
+  // Fetch products (for selection)
+  const HIGH_STOCK_MIN = 4
+  const { data: highStockItems = [] } = useQuery({
+    queryKey: ["inventory", "high-stock", HIGH_STOCK_MIN],
+    queryFn: () => fetchHighStockInventory(HIGH_STOCK_MIN),
   })
 
   // Fetch customers
@@ -93,62 +92,15 @@ export default function CreditSales() {
 
   const pool = useMemo(() => {
     const q = query.toLowerCase()
-    return products.filter((r) => (r.name || "").toLowerCase().includes(q) || (r.sku || "").toLowerCase().includes(q))
-  }, [query, products])
+    return highStockItems.filter((r) => (r.name || "").toLowerCase().includes(q) || (r.sku || "").toLowerCase().includes(q))
+  }, [query, highStockItems])
 
-  const addToCart = (item, variant = null) => {
+  const addToCart = (item) =>
     setCart((prev) => {
-      const itemKey = variant ? `${item.sku}-${variant.name}-${variant.value}` : item.sku
-      const existingItem = prev.find((p) => {
-        const cartKey = p.variant ? `${p.sku}-${p.variant.name}-${p.variant.value}` : p.sku
-        return cartKey === itemKey
-      })
-
-      const basePrice = item.selling_price ?? item.price ?? 0
-      const variantPrice = variant ? (variant.additional_price || 0) : 0
-      const finalPrice = basePrice + variantPrice
-
-      const mapped = {
-        ...item,
-        price: finalPrice,
-        variant: variant ? {
-          name: variant.name,
-          value: variant.value,
-          sku_suffix: variant.sku_suffix || "",
-          additional_price: variant.additional_price || 0
-        } : null,
-        displayName: variant ? `${item.name} (${variant.name}: ${variant.value})` : item.name
-      }
-
-      return existingItem
-        ? prev.map((p) => {
-            const cartKey = p.variant ? `${p.sku}-${p.variant.name}-${p.variant.value}` : p.sku
-            return cartKey === itemKey ? { ...p, qty: p.qty + 1 } : p
-          })
-        : [...prev, { ...mapped, qty: 1 }]
+      const f = prev.find((p) => p.sku === item.sku)
+      const mapped = { ...item, price: item.selling_price ?? item.price ?? 0 }
+      return f ? prev.map((p) => (p.sku === item.sku ? { ...p, qty: p.qty + 1 } : p)) : [...prev, { ...mapped, qty: 1 }]
     })
-  }
-
-  const handleProductClick = (product) => {
-    if (product.variants && product.variants.length > 0) {
-      setSelectedProductForVariant(product)
-      setSelectedVariant(null)
-      setShowVariantDialog(true)
-    } else {
-      addToCart(product)
-    }
-  }
-
-  const handleAddWithVariant = () => {
-    if (!selectedVariant) {
-      alert("Please select a variant")
-      return
-    }
-    addToCart(selectedProductForVariant, selectedVariant)
-    setShowVariantDialog(false)
-    setSelectedProductForVariant(null)
-    setSelectedVariant(null)
-  }
 
   const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0)
   const discountAmount = discount.type === "percentage" ? (subtotal * discount.value) / 100 : discount.value
@@ -255,19 +207,19 @@ export default function CreditSales() {
 
   return (
     <Section title="Credit Sales" breadcrumbs={["Home", "Sales", "Credit"]}>
-      <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
-        <Grid container spacing={4}>
+      <Grid container spacing={2} sx={{ maxWidth: '1400px', mx: 'auto' }}>
         
-        {/* Payment Summary - LEFT SIDE (md=4) */}
-        <Grid item xs={12} md={4} sx={{ order: { xs: 2, md: 1 } }}>
-          <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
+        {/* Payment Summary - LEFT SIDE (md=5) */}
+        <Grid item xs={12} md={5} sx={{ order: { xs: 2, md: 1 } }}>
+          <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005', height: '100%' }}>
+            <CardContent sx={{ p: 2.5, display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 2 }}>
                 Payment Summary
               </Typography>
 
+              <Box sx={{ flex: 1, overflowY: 'auto', pr: 1, mb: 2 }}>
               {/* Customer Selection */}
-              <Box sx={{ mb: 2.5 }}>
+              <Box sx={{ mb: 2 }}>
                 <Autocomplete
                   options={customers}
                   getOptionLabel={(option) => `${option.name} - ${option.email}`}
@@ -284,7 +236,7 @@ export default function CreditSales() {
                       <div className="flex flex-col">
                         <span className="font-medium">{option.name}</span>
                         <span className="text-xs text-slate-500">
-                          Debt: Rs {Number(option.current_balance || 0).toFixed(2)} / Rs {Number(option.credit_limit || 0).toFixed(2)}
+                          Debt: ${Number(option.current_balance || 0).toFixed(2)} / ${Number(option.credit_limit || 0).toFixed(2)}
                         </span>
                       </div>
                     </li>
@@ -293,7 +245,7 @@ export default function CreditSales() {
               </Box>
 
               {/* Location selection */}
-              <Box sx={{ mb: 2.5 }}>
+              <Box sx={{ mb: 2 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Location</InputLabel>
                   <Select value={selectedLocationId} label="Location" onChange={(e) => setSelectedLocationId(e.target.value)}>
@@ -307,7 +259,7 @@ export default function CreditSales() {
               </Box>
 
               {/* Due Date and Allowed Delay */}
-              <Box sx={{ mb: 2.5 }}>
+              <Box sx={{ mb: 2 }}>
                 <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
                   <TextField
                     type="date"
@@ -333,7 +285,7 @@ export default function CreditSales() {
 
               {/* Display calculated allowed_until date */}
               {invoiceDetails.dueDate && invoiceDetails.allowedDelay > 0 && (
-                <Box sx={{ mb: 2.5 }}>
+                <Box sx={{ mb: 2 }}>
                   <Alert severity="info" icon={<CheckCircle />} sx={{ fontSize: '0.8rem', py: 0.5 }}>
                     Deadline: {' '}
                     <strong>
@@ -349,19 +301,19 @@ export default function CreditSales() {
 
               {/* Customer Debt Alert */}
               {selectedCustomer && (
-                <Box sx={{ mb: 2.5 }}>
+                <Box sx={{ mb: 2 }}>
                   <Alert
                     severity={currentDebt > maxDebt * 0.8 ? "warning" : "info"}
                     icon={currentDebt > maxDebt * 0.8 ? <Warning /> : <CheckCircle />}
                     sx={{ fontSize: '0.8rem', py: 0.5 }}
                   >
-                    Debt: Rs {currentDebt.toFixed(2)} / Rs {maxDebt.toFixed(2)}
+                    Debt: ${currentDebt.toFixed(2)} / ${maxDebt.toFixed(2)}
                   </Alert>
                 </Box>
               )}
 
               {/* Discount */}
-              <Box sx={{ mb: 2.5 }}>
+              <Box sx={{ mb: 2 }}>
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   <TextField
                     select
@@ -372,7 +324,7 @@ export default function CreditSales() {
                     size="small"
                   >
                     <MenuItem value="percentage">%</MenuItem>
-                    <MenuItem value="fixed">Rs</MenuItem>
+                    <MenuItem value="fixed">$</MenuItem>
                   </TextField>
                   <TextField
                     fullWidth
@@ -386,34 +338,34 @@ export default function CreditSales() {
                 </Box>
               </Box>
 
-              <Divider sx={{ my: 2.5 }} />
+              <Divider sx={{ my: 1.5 }} />
 
               {/* Balance & Terms Section */}
               {selectedCustomer && (
                 <>
-                  <Box sx={{ mb: 2.5 }}>
+                  <Box sx={{ mb: 2 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
                       <span>Current Debt</span>
-                      <Typography sx={{ fontWeight: 600 }}>Rs {currentDebt.toFixed(2)}</Typography>
+                      <Typography sx={{ fontWeight: 600 }}>${currentDebt.toFixed(2)}</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem', color: '#4caf50' }}>
                       <span>New Sale</span>
-                      <Typography sx={{ fontWeight: 600 }}>+Rs {total.toFixed(2)}</Typography>
+                      <Typography sx={{ fontWeight: 600 }}>+${total.toFixed(2)}</Typography>
                     </Box>
                     <Divider sx={{ my: 1.5 }} />
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Typography sx={{ fontWeight: 600 }}>New Total Debt</Typography>
                       <Typography sx={{ fontWeight: 700, color: !canProceed ? '#d32f2f' : 'inherit' }}>
-                        Rs {newDebt.toFixed(2)}
+                        ${newDebt.toFixed(2)}
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: 'text.secondary' }}>
                       <span>Credit Limit</span>
-                      <span>Rs {maxDebt.toFixed(2)}</span>
+                      <span>${maxDebt.toFixed(2)}</span>
                     </Box>
                   </Box>
 
-                  <Box sx={{ mb: 2.5 }}>
+                  <Box sx={{ mb: 2 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'text.secondary', mb: 1 }}>
                       <span>Credit Usage</span>
                       <span>{debtPercentage.toFixed(0)}%</span>
@@ -427,33 +379,34 @@ export default function CreditSales() {
                   </Box>
 
                   {!canProceed && (
-                    <Box sx={{ mb: 2.5 }}>
+                    <Box sx={{ mb: 2 }}>
                       <Alert severity="error" sx={{ fontSize: '0.875rem' }}>
                         Credit limit exceeded! Cannot proceed with this sale.
                       </Alert>
                     </Box>
                   )}
 
-                  <Divider sx={{ my: 2.5 }} />
+                  <Divider sx={{ my: 1.5 }} />
                 </>
               )}
 
               {/* Price Summary - NO TAX */}
-              <Box sx={{ mb: 2.5 }}>
+              <Box sx={{ mb: 2 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
                   <span>Subtotal</span>
-                  <Typography sx={{ fontWeight: 500 }}>Rs {subtotal.toFixed(2)}</Typography>
+                  <Typography sx={{ fontWeight: 500 }}>${subtotal.toFixed(2)}</Typography>
                 </Box>
                 {discountAmount > 0 && (
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem', color: '#4caf50' }}>
-                    <span>Discount ({discount.type === "percentage" ? `${discount.value}%` : "Rs"})</span>
-                    <Typography sx={{ fontWeight: 500 }}>-Rs {discountAmount.toFixed(2)}</Typography>
+                    <span>Discount ({discount.type === "percentage" ? `${discount.value}%` : "$"})</span>
+                    <Typography sx={{ fontWeight: 500 }}>-${discountAmount.toFixed(2)}</Typography>
                   </Box>
                 )}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: 600, pt: 1 }}>
                   <span>Total</span>
-                  <span>Rs {total.toFixed(2)}</span>
+                  <span>${total.toFixed(2)}</span>
                 </Box>
+              </Box>
               </Box>
 
               {/* Buttons */}
@@ -466,8 +419,8 @@ export default function CreditSales() {
                     !selectedCustomer || cart.length === 0 || !canProceed || !invoiceDetails.dueDate || isProcessing
                   }
                   fullWidth
-                  sx={{
-                    mb: 1.5,
+                  sx={{ 
+                    mb: 1,
                     bgcolor: '#4caf50',
                     '&:hover': { bgcolor: '#45a049' }
                   }}
@@ -489,89 +442,54 @@ export default function CreditSales() {
           </Card>
         </Grid>
 
-        {/* Select Items - RIGHT SIDE (md=8) */}
-        <Grid item xs={12} md={8} sx={{ order: { xs: 1, md: 2 } }}>
+        {/* Select Items - RIGHT SIDE (md=7) */}
+        <Grid item xs={12} md={7} sx={{ order: { xs: 1, md: 2 } }}>
           <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
+            <CardContent sx={{ p: 2.5 }}>
+              <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 2 }}>
                 Select Items
               </Typography>
 
               {/* Search Bar */}
               <Box sx={{ mb: 2 }}>
-                <SearchInput 
-                  placeholder="Search products by name or SKU..." 
-                  value={query} 
-                  onChange={setQuery}
-                />
+                <SearchInput placeholder="Search products" value={query} onChange={setQuery} />
               </Box>
 
               {/* Product Grid */}
               <Box sx={{ mb: 3 }}>
-                <div className="grid grid-cols-3 md:grid-cols-6 gap-2 max-h-[450px] overflow-y-auto p-2">
-                  {loadingProducts ? (
-                    <div className="col-span-6 text-center py-8 text-slate-500">
-                      Loading products...
-                    </div>
-                  ) : pool.length === 0 ? (
-                    <div className="col-span-6 text-center py-8 text-slate-500">
-                      No products found
-                    </div>
-                  ) : (
-                    pool.slice(0, 30).map((p) => (
-                      <Button
-                        key={p.sku}
-                        variant="outlined"
-                        onClick={() => handleProductClick(p)}
-                        size="small"
-                        sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start',
-                          minHeight: '85px',
-                          p: 1.5,
-                          borderColor: '#4caf5050',
-                          textAlign: 'left',
-                          '&:hover': {
-                            borderColor: '#4caf50',
-                            bgcolor: '#4caf5010'
-                          }
-                        }}
-                      >
-                        <Typography sx={{ 
-                          fontSize: '0.7rem', 
-                          fontWeight: 600, 
-                          lineHeight: 1.2,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          width: '100%'
-                        }}>
-                          {p.name}
-                        </Typography>
-                        <Box sx={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', mt: 'auto' }}>
-                          <Typography sx={{ fontWeight: 700, fontSize: '0.75rem' }}>
-                            Rs {Number(p.selling_price ?? p.price ?? 0).toFixed(2)}
-                          </Typography>
-                          {p.variants && p.variants.length > 0 && (
-                            <Chip 
-                              label={`${p.variants.length}v`} 
-                              size="small" 
-                              sx={{ 
-                                height: 14, 
-                                fontSize: '0.6rem',
-                                bgcolor: '#4caf5020',
-                                color: '#4caf50'
-                              }} 
-                            />
-                          )}
-                        </Box>
-                      </Button>
-                    ))
-                  )}
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 10,
+                    maxHeight: '320px',
+                    overflowY: 'auto',
+                    padding: 4
+                  }}>
+                  {pool.slice(0, 15).map((p) => (
+                    <Button
+                      key={p.sku}
+                      variant="outlined"
+                      onClick={() => addToCart(p)}
+                      size="small"
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        height: 95,
+                        p: 1.5,
+                        borderColor: '#4caf5050',
+                        textAlign: 'left',
+                        '&:hover': {
+                          borderColor: '#4caf50',
+                          bgcolor: '#4caf5010'
+                        }
+                      }}
+                    >
+                      <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', width: '100%' }}>{p.name}</span>
+                      <span style={{ fontWeight: 700, fontSize: 13 }}>${Number(p.selling_price ?? p.price ?? 0).toFixed(2)}</span>
+                    </Button>
+                  ))}
                 </div>
               </Box>
 
@@ -579,7 +497,7 @@ export default function CreditSales() {
 
               {/* Cart Items */}
               <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, fontSize: '0.9rem' }}>
                   Cart Items
                 </Typography>
                 {cart.length === 0 && (
@@ -587,83 +505,52 @@ export default function CreditSales() {
                     No items added yet
                   </Typography>
                 )}
-                {cart.map((c, index) => {
-                  const itemKey = c.variant 
-                    ? `${c.sku}-${c.variant.name}-${c.variant.value}-${index}` 
-                    : `${c.sku}-${index}`
-                  return (
-                    <Box key={itemKey} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 2, borderRadius: 2, bgcolor: '#f8f9fa', mb: 2 }}>
-                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {c.displayName || c.name}
-                          {c.variant && c.variant.additional_price !== 0 && (
-                            <span style={{ fontSize: '0.75rem', color: '#4caf50', marginLeft: '4px' }}>
-                              (+Rs {c.variant.additional_price.toFixed(2)})
-                            </span>
-                          )}
-                        </Typography>
-                        <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
-                          {c.qty} × Rs {c.price.toFixed(2)} = Rs {(c.qty * c.price).toFixed(2)}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <IconButton
-                          size="small"
-                          onClick={() =>
-                            setCart((prev) => {
-                              const cartKey = c.variant 
-                                ? `${c.sku}-${c.variant.name}-${c.variant.value}` 
-                                : c.sku
-                              return prev.map((p, i) => {
-                                const pKey = p.variant 
-                                  ? `${p.sku}-${p.variant.name}-${p.variant.value}` 
-                                  : p.sku
-                                return pKey === cartKey && i === index 
-                                  ? { ...p, qty: Math.max(1, p.qty - 1) } 
-                                  : p
-                              })
-                            })
-                          }
-                        >
-                          -
-                        </IconButton>
-                        <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, minWidth: 24, textAlign: 'center' }}>{c.qty}</Typography>
-                        <IconButton
-                          size="small"
-                          onClick={() =>
-                            setCart((prev) => {
-                              const cartKey = c.variant 
-                                ? `${c.sku}-${c.variant.name}-${c.variant.value}` 
-                                : c.sku
-                              return prev.map((p, i) => {
-                                const pKey = p.variant 
-                                  ? `${p.sku}-${p.variant.name}-${p.variant.value}` 
-                                  : p.sku
-                                return pKey === cartKey && i === index ? { ...p, qty: p.qty + 1 } : p
-                              })
-                            })
-                          }
-                        >
-                          +
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => setCart((prev) => prev.filter((_, i) => i !== index))}
-                        >
-                          <Delete fontSize="small" />
-                        </IconButton>
-                      </Box>
+                {cart.map((c) => (
+                  <Box key={c.sku} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 1.5, borderRadius: 2, bgcolor: '#f8f9fa', mb: 1.5 }}>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {c.name}
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+                        {c.qty} × ${c.price.toFixed(2)} = ${(c.qty * c.price).toFixed(2)}
+                      </Typography>
                     </Box>
-                  )
-                })}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          setCart((prev) =>
+                            prev.map((p) => (p.sku === c.sku ? { ...p, qty: Math.max(1, p.qty - 1) } : p)),
+                          )
+                        }
+                      >
+                        -
+                      </IconButton>
+                      <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, minWidth: 24, textAlign: 'center' }}>{c.qty}</Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          setCart((prev) => prev.map((p) => (p.sku === c.sku ? { ...p, qty: p.qty + 1 } : p)))
+                        }
+                      >
+                        +
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => setCart((prev) => prev.filter((p) => p.sku !== c.sku))}
+                      >
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </Box>
+                ))}
               </Box>
             </CardContent>
           </Card>
         </Grid>
 
       </Grid>
-      </Box>
 
       <Dialog open={showNewCustomer} onClose={() => setShowNewCustomer(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Add New Customer</DialogTitle>
@@ -812,58 +699,6 @@ export default function CreditSales() {
         <DialogActions>
           <Button variant="contained" onClick={handleCompleteSale}>
             Complete Credit Sale
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Variant Selection Dialog */}
-      <Dialog open={showVariantDialog} onClose={() => setShowVariantDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          Select Variant
-          {selectedProductForVariant && (
-            <Typography variant="body2" color="text.secondary">
-              {selectedProductForVariant.name}
-            </Typography>
-          )}
-        </DialogTitle>
-        <DialogContent>
-          <FormControl fullWidth sx={{ mt: 2 }}>
-            <InputLabel>Choose Variant</InputLabel>
-            <Select
-              value={selectedVariant ? JSON.stringify(selectedVariant) : ""}
-              label="Choose Variant"
-              onChange={(e) => setSelectedVariant(JSON.parse(e.target.value))}
-            >
-              {selectedProductForVariant?.variants?.map((variant, index) => {
-                const variantPrice = (selectedProductForVariant.selling_price || 0) + (variant.additional_price || 0)
-                return (
-                  <MenuItem key={index} value={JSON.stringify(variant)}>
-                    <div className="flex justify-between items-center w-full">
-                      <span>
-                        {variant.name}: {variant.value}
-                        {variant.sku_suffix && (
-                          <span className="text-xs text-slate-500 ml-1">({variant.sku_suffix})</span>
-                        )}
-                      </span>
-                      <span className="font-semibold ml-4">
-                        Rs {variantPrice.toFixed(2)}
-                        {variant.additional_price !== 0 && (
-                          <span className="text-xs text-green-600 ml-1">
-                            (+Rs {variant.additional_price.toFixed(2)})
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  </MenuItem>
-                )
-              })}
-            </Select>
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowVariantDialog(false)}>Cancel</Button>
-          <Button onClick={handleAddWithVariant} variant="contained" disabled={!selectedVariant} sx={{ bgcolor: '#4caf50', '&:hover': { bgcolor: '#45a049' } }}>
-            Add to Cart
           </Button>
         </DialogActions>
       </Dialog>

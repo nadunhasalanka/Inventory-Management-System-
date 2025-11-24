@@ -1,8 +1,8 @@
 "use client"
 import { useCurrentUser } from "../context/CurrentUserContext"
-import AdminDashboard from "./dashboards/AdminDashboard"
-import ManagerDashboard from "./dashboards/ManagerDashboard"
-import StaffDashboard from "./dashboards/StaffDashboard"
+// import AdminDashboard from "./dashboards/AdminDashboard"
+// import ManagerDashboard from "./dashboards/ManagerDashboard"
+// import StaffDashboard from "./dashboards/StaffDashboard"
 
 export default function Dashboard() {
   const { currentUser } = useCurrentUser()
@@ -12,10 +12,10 @@ export default function Dashboard() {
 
   // Route to appropriate dashboard
   if (userRole === "admin") {
-    return <AdminDashboard />
+    // return <AdminDashboard />
   } else if (userRole === "manager" || userRole === "warehousestaff") {
-    return <ManagerDashboard />
+    // return <ManagerDashboard />
   } else {
-    return <StaffDashboard />
+    // return <StaffDashboard />
   }
 }

@@ -293,19 +293,19 @@ export default function CashSales() {
     <>
       {/* NEW CLEAN LAYOUT */}
       <Section title="Cash Sales" breadcrumbs={["Home", "Sales", "Cash"]}>
-        <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
-          <Grid container spacing={4}>
+        <Grid container spacing={2} sx={{ maxWidth: '1400px', mx: 'auto' }}>
           
-          {/* Payment Summary - LEFT SIDE (md=4) */}
-          <Grid item xs={12} md={4} sx={{ order: { xs: 2, md: 1 } }}>
-            <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
+          {/* Payment Summary - LEFT SIDE (md=5) */}
+          <Grid item xs={12} md={5} sx={{ order: { xs: 2, md: 1 } }}>
+            <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005', height: '100%' }}>
+              <CardContent sx={{ p: 2.5, display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 2 }}>
                   Payment Summary
                 </Typography>
 
+                <Box sx={{ flex: 1, overflowY: 'auto', pr: 1, mb: 2 }}>
                 {/* Location */}
-                <Box sx={{ mb: 2.5 }}>
+                <Box sx={{ mb: 2 }}>
                   <FormControl fullWidth size="small">
                     <InputLabel>Location</InputLabel>
                     <Select
@@ -323,7 +323,7 @@ export default function CashSales() {
                 </Box>
 
                 {/* Customer */}
-                <Box sx={{ mb: 2.5 }}>
+                <Box sx={{ mb: 2 }}>
                   <FormControl fullWidth size="small">
                     <InputLabel>Customer</InputLabel>
                     <Select
@@ -342,7 +342,7 @@ export default function CashSales() {
 
                 {/* Customer Name Optional - only show when no customer selected (walk-in) */}
                 {!selectedCustomerId && (
-                  <Box sx={{ mb: 2.5 }}>
+                  <Box sx={{ mb: 2 }}>
                     <TextField
                       fullWidth
                       size="small"
@@ -355,7 +355,7 @@ export default function CashSales() {
                 )}
 
                 {/* Payment Method */}
-                <Box sx={{ mb: 2.5 }}>
+                <Box sx={{ mb: 2 }}>
                   <FormControl fullWidth size="small">
                     <InputLabel>Payment Method</InputLabel>
                     <Select value={paymentMethod} label="Payment Method" onChange={(e) => setPaymentMethod(e.target.value)}>
@@ -375,7 +375,7 @@ export default function CashSales() {
 
                 {/* Split Payment */}
                 {paymentMethod === "split" && (
-                  <Box sx={{ mb: 2.5 }}>
+                  <Box sx={{ mb: 2 }}>
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
                       <Chip size="small" label="0%" onClick={() => { setSplitCash(0); setSplitCredit(total); }} />
                       <Chip size="small" label="50%" onClick={() => { const v = Number((total * 0.5).toFixed(2)); setSplitCash(v); setSplitCredit(Number((total - v).toFixed(2))); }} />
@@ -399,13 +399,13 @@ export default function CashSales() {
 
                 {/* Credit Alert */}
                 {paymentMethod === "credit" && (
-                  <Box sx={{ mb: 2.5 }}>
+                  <Box sx={{ mb: 2 }}>
                     <Alert severity="info">Entire amount will be booked to customer credit balance.</Alert>
                   </Box>
                 )}
 
                 {/* Discount */}
-                <Box sx={{ mb: 2.5 }}>
+                <Box sx={{ mb: 2 }}>
                   <Box sx={{ display: 'flex', gap: 2 }}>
                     <TextField
                       select
@@ -429,11 +429,12 @@ export default function CashSales() {
                     />
                   </Box>
                 </Box>
+                </Box>
 
-                <Divider sx={{ my: 2.5 }} />
+                <Divider sx={{ my: 1.5 }} />
 
                 {/* Price Summary - NO TAX */}
-                <Box sx={{ mb: 2.5 }}>
+                <Box sx={{ mb: 2 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
                     <span>Subtotal</span>
                     <Typography sx={{ fontWeight: 500 }}>${subtotal.toFixed(2)}</Typography>
@@ -481,36 +482,34 @@ export default function CashSales() {
             </Card>
           </Grid>
 
-          {/* Items Selection - RIGHT SIDE (md=8) */}
-          <Grid item xs={12} md={8} sx={{ order: { xs: 1, md: 2 } }}>
+          {/* Items Selection - RIGHT SIDE (md=7) */}
+          <Grid item xs={12} md={7} sx={{ order: { xs: 1, md: 2 } }}>
             <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
-              <CardContent sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
+              <CardContent sx={{ p: 2.5 }}>
+                <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 2 }}>
                   Select Items
                 </Typography>
 
-                {/* Search Bar */}
-                <Box sx={{ mb: 2 }}>
-                  <SearchInput 
-                    placeholder="Search products by name or SKU..." 
-                    value={query} 
-                    onChange={setQuery}
-                  />
-                </Box>
-
                 {/* Product Grid */}
                 <Box sx={{ mb: 3 }}>
-                  <div className="grid grid-cols-3 md:grid-cols-6 gap-2 max-h-[450px] overflow-y-auto p-2">
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 10,
+                    maxHeight: '320px',
+                    overflowY: 'auto',
+                    padding: 4
+                  }}>
                     {loadingProducts ? (
-                      <div className="col-span-6 text-center py-8 text-slate-500">
+                      <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem 0', color: '#64748b' }}>
                         Loading products...
                       </div>
                     ) : pool.length === 0 ? (
-                      <div className="col-span-6 text-center py-8 text-slate-500">
+                      <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem 0', color: '#64748b' }}>
                         No products found
                       </div>
                     ) : (
-                      pool.slice(0, 30).map((p) => (
+                      pool.slice(0, 15).map((p) => (
                         <Button
                           key={p.sku}
                           variant="outlined"
@@ -521,7 +520,7 @@ export default function CashSales() {
                             flexDirection: 'column',
                             justifyContent: 'space-between',
                             alignItems: 'flex-start',
-                            minHeight: '85px',
+                            height: 95,
                             p: 1.5,
                             borderColor: '#4caf5050',
                             textAlign: 'left',
@@ -531,36 +530,22 @@ export default function CashSales() {
                             }
                           }}
                         >
-                          <Typography sx={{ 
-                            fontSize: '0.7rem', 
-                            fontWeight: 600, 
-                            lineHeight: 1.2,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            width: '100%'
-                          }}>
-                            {p.name}
-                          </Typography>
-                          <Box sx={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', mt: 'auto' }}>
-                            <Typography sx={{ fontWeight: 700, fontSize: '0.75rem' }}>
-                              Rs {Number(p.selling_price ?? p.price ?? 0).toFixed(2)}
-                            </Typography>
+                          <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', width: '100%' }}>{p.name}</span>
+                          <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+                            <span style={{ fontWeight: 700, fontSize: 13 }}>Rs {Number(p.selling_price ?? p.price ?? 0).toFixed(2)}</span>
                             {p.variants && p.variants.length > 0 && (
                               <Chip 
                                 label={`${p.variants.length}v`} 
                                 size="small" 
                                 sx={{ 
-                                  height: 14, 
+                                  height: 16, 
                                   fontSize: '0.6rem',
                                   bgcolor: '#4caf5020',
                                   color: '#4caf50'
                                 }} 
                               />
                             )}
-                          </Box>
+                          </div>
                         </Button>
                       ))
                     )}
@@ -571,7 +556,7 @@ export default function CashSales() {
 
                 {/* Cart Items */}
                 <Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, fontSize: '0.9rem' }}>
                     Cart Items
                   </Typography>
                   {cart.length === 0 && (
@@ -584,7 +569,7 @@ export default function CashSales() {
                       ? `${c.sku}-${c.variant.name}-${c.variant.value}-${index}` 
                       : `${c.sku}-${index}`
                     return (
-                      <Box key={itemKey} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 2, borderRadius: 2, bgcolor: '#f8f9fa', mb: 2 }}>
+                      <Box key={itemKey} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 1.5, borderRadius: 2, bgcolor: '#f8f9fa', mb: 1.5 }}>
                         <Box sx={{ minWidth: 0, flex: 1 }}>
                           <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {c.displayName || c.name}
@@ -657,7 +642,6 @@ export default function CashSales() {
           </Grid>
 
         </Grid>
-        </Box>
       </Section>
       {/* Invoice Dialog */}
       <Dialog open={showInvoice} onClose={() => setShowInvoice(false)} maxWidth="md" fullWidth>

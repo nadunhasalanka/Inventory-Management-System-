@@ -8,7 +8,7 @@ import QueryProvider from "../components/QueryProvider"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "v0 App",
+  title: "v0 Apps",
   description: "Created with v0",
   generator: "v0.app",
 }

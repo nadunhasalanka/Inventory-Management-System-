@@ -31,7 +31,6 @@ import { fetchProducts } from "../services/productApi"
 import { fetchCustomers, createCustomer } from "../services/customersApi"
 import { fetchLocations } from "../services/inventoryApi"
 import { processCheckout } from "../services/salesApi"
-import { fiscalizeInvoice, generateInvoiceJSON } from "../app/actions/mra"
 import { useCurrentUser } from "../context/CurrentUserContext"
 
 export default function CreditSales() {
@@ -221,23 +220,27 @@ export default function CreditSales() {
       idNumber: null,
     }
 
-  const invoiceJSON = generateInvoiceJSON(cart, customerData, "credit")
-    invoiceJSON.discount = discountAmount
-    invoiceJSON.discountType = discount.type
-    invoiceJSON.discountValue = discount.value
-    invoiceJSON.subtotal = subtotal
-    invoiceJSON.total = total
-  // Remove tax persistence; UI still shows tax calculation but we do not store in backend schema
-
-    const fiscalResult = await fiscalizeInvoice(invoiceJSON, true)
-
-    setInvoiceData({
-      ...invoiceJSON,
-      ...fiscalResult,
+  const invoiceRecord = {
+      invoiceNumber: `INV-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      customer: customerData,
+      items: cart.map(item => ({
+        name: item.displayName || item.name,
+        quantity: item.qty,
+        price: item.price,
+        total: item.qty * item.price
+      })),
+      discount: discountAmount,
+      discountType: discount.type,
+      discountValue: discount.value,
+      subtotal: subtotal,
+      total: total,
       dueDate: invoiceDetails.dueDate,
       allowedDelay: invoiceDetails.allowedDelay,
       salesOrder,
-    })
+    }
+
+    setInvoiceData(invoiceRecord)
 
     setShowInvoice(true)
     setIsProcessing(false)
@@ -714,10 +717,7 @@ export default function CreditSales() {
         </DialogTitle>
         <DialogContent>
           {invoiceData && (
-            <div className="space-y-4">
-              {invoiceData.success && (
-                <Alert severity="success">Credit invoice successfully fiscalized with MRA!</Alert>
-              )}
+            <div className="space-y-4" id="credit-invoice-print-area">
 
               <Grid container spacing={2}>
                 <Grid item xs={6}>
@@ -778,11 +778,11 @@ export default function CreditSales() {
                   Items
                 </Typography>
                 {invoiceData.items?.map((item, i) => (
-                  <div key={i} className="flex justify-between text-sm py-1">
+                  <div key={index} className="flex justify-between">
                     <span>
                       {item.name} × {item.quantity}
                     </span>
-                    <span className="font-medium">${item.total.toFixed(2)}</span>
+                    <span className="font-medium">Rs {item.total.toFixed(2)}</span>
                   </div>
                 ))}
               </div>
@@ -792,24 +792,40 @@ export default function CreditSales() {
               <div className="space-y-1">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span>${invoiceData.subtotal.toFixed(2)}</span>
+                  <span>Rs {invoiceData.subtotal.toFixed(2)}</span>
                 </div>
                 {invoiceData.discount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Discount</span>
-                    <span>-${invoiceData.discount.toFixed(2)}</span>
+                    <span>-Rs {invoiceData.discount.toFixed(2)}</span>
                   </div>
                 )}
                 {/* Tax removed per requirements */}
                 <div className="flex justify-between text-lg font-semibold">
                   <span>Total</span>
-                  <span>${invoiceData.total.toFixed(2)}</span>
+                  <span>Rs {invoiceData.total.toFixed(2)}</span>
                 </div>
               </div>
             </div>
           )}
         </DialogContent>
         <DialogActions>
+          <Button 
+            variant="outlined" 
+            onClick={() => {
+              const printContent = document.getElementById('credit-invoice-print-area')
+              const windowPrint = window.open('', '', 'width=800,height=600')
+              windowPrint.document.write('<html><head><title>Credit Invoice</title>')
+              windowPrint.document.write('<style>body{font-family:Arial,sans-serif;padding:20px}@media print{body{padding:0}}</style>')
+              windowPrint.document.write('</head><body>')
+              windowPrint.document.write(printContent.innerHTML)
+              windowPrint.document.write('</body></html>')
+              windowPrint.document.close()
+              windowPrint.print()
+            }}
+          >
+            Print Invoice
+          </Button>
           <Button variant="contained" onClick={handleCompleteSale}>
             Complete Credit Sale
           </Button>

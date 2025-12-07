@@ -5,6 +5,49 @@ const asyncHandler = require('../middleware/asyncHandler');
 // @route   POST /api/payments
 exports.createPayment = asyncHandler(async (req, res, next) => {
     const payment = await Payment.create(req.body);
+    
+    // If this is a supplier payment for a PO, update the PO's payment status
+    if (payment.entity_type === 'PurchaseOrder' && payment.type === 'Supplier Payment') {
+        const po = await PurchaseOrder.findById(payment.entity_id);
+        
+        if (po) {
+            // Initialize invoice_details if it doesn't exist
+            if (!po.invoice_details) {
+                po.invoice_details = {
+                    invoice_number: `INV-${po.po_number}`,
+                    invoice_date: new Date(),
+                    invoice_amount: po.line_items.reduce((sum, item) => sum + item.total_cost, 0),
+                    payment_status: 'Pending',
+                    payment_ids: []
+                };
+            }
+            
+            // Add payment ID to the PO
+            po.invoice_details.payment_ids.push(payment._id);
+            
+            // Calculate total paid amount
+            const allPayments = await Payment.find({
+                entity_type: 'PurchaseOrder',
+                entity_id: po._id,
+                type: 'Supplier Payment'
+            });
+            
+            const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
+            const totalAmount = po.line_items.reduce((sum, item) => sum + item.total_cost, 0);
+            
+            // Update payment status
+            if (totalPaid >= totalAmount) {
+                po.invoice_details.payment_status = 'Paid';
+            } else if (totalPaid > 0) {
+                po.invoice_details.payment_status = 'Partially Paid';
+            } else {
+                po.invoice_details.payment_status = 'Pending';
+            }
+            
+            await po.save();
+        }
+    }
+    
     res.status(201).json({ success: true, data: payment });
 });
 

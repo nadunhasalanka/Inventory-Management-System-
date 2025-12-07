@@ -33,7 +33,6 @@ import { fetchProducts } from "../services/productApi"
 import { fetchCustomers } from "../services/customersApi"
 import { fetchLocations } from "../services/inventoryApi"
 import { processCheckout } from "../services/salesApi"
-import { fiscalizeInvoice, generateInvoiceJSON } from "../app/actions/mra"
 import { useCurrentUser } from "../context/CurrentUserContext"
 
 const PAYMENT_METHODS = [
@@ -248,24 +247,23 @@ export default function CashSales() {
 
     // Generate invoice JSON
   // Always label as Walk-in in invoice output
-  const customerData = { name: "Walk-in Customer", phone: null, idNumber: null }
-  const invoiceJSON = await generateInvoiceJSON(cart, customerData, paymentTypeMap[paymentMethod].toLowerCase())
-
-    invoiceJSON.discount = discountAmount
-    invoiceJSON.discountType = discount.type
-    invoiceJSON.discountValue = discount.value
-    invoiceJSON.subtotal = subtotal
-    invoiceJSON.total = total
-    invoiceJSON.tax = tax
-    invoiceJSON.paymentMethod = paymentMethod
-    invoiceJSON.paymentReference = paymentReference
-
-    // Fiscalize with MRA (server-side)
-    const fiscalResult = await fiscalizeInvoice(invoiceJSON, false)
-
-    const saleRecord = {
-      ...invoiceJSON,
-      ...fiscalResult,
+  const saleRecord = {
+      invoiceNumber: `INV-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      customerName: "Walk-in Customer",
+      items: cart.map(item => ({
+        name: item.displayName || item.name,
+        quantity: item.qty,
+        price: item.price,
+        total: item.qty * item.price
+      })),
+      discount: discountAmount,
+      discountType: discount.type,
+      discountValue: discount.value,
+      subtotal: subtotal,
+      total: total,
+      paymentMethod: paymentMethod,
+      paymentReference: paymentReference,
       id: Date.now(),
       date: new Date().toISOString(),
     }
@@ -392,7 +390,7 @@ export default function CashSales() {
                         setSplitCredit(Number((total - v).toFixed(2)));
                       }}
                       size="small"
-                      helperText={`Credit to book: $${Number(splitCredit).toFixed(2)} (Total: $${total.toFixed(2)})`}
+                      helperText={`Credit to book: Rs ${Number(splitCredit).toFixed(2)} (Total: Rs ${total.toFixed(2)})`}
                     />
                   </Box>
                 )}
@@ -416,7 +414,7 @@ export default function CashSales() {
                       size="small"
                     >
                       <MenuItem value="percentage">%</MenuItem>
-                      <MenuItem value="fixed">$</MenuItem>
+                      <MenuItem value="fixed">Rs</MenuItem>
                     </TextField>
                     <TextField
                       fullWidth
@@ -436,17 +434,17 @@ export default function CashSales() {
                 <Box sx={{ mb: 2.5 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
                     <span>Subtotal</span>
-                    <Typography sx={{ fontWeight: 500 }}>${subtotal.toFixed(2)}</Typography>
+                    <Typography sx={{ fontWeight: 500 }}>Rs {subtotal.toFixed(2)}</Typography>
                   </Box>
                   {discountAmount > 0 && (
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem', color: '#4caf50' }}>
-                      <span>Discount ({discount.type === "percentage" ? `${discount.value}%` : "$"})</span>
-                      <Typography sx={{ fontWeight: 500 }}>-${discountAmount.toFixed(2)}</Typography>
+                      <span>Discount ({discount.type === "percentage" ? `${discount.value}%` : "Rs"})</span>
+                      <Typography sx={{ fontWeight: 500 }}>-Rs {discountAmount.toFixed(2)}</Typography>
                     </Box>
                   )}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: 600, pt: 1 }}>
                     <span>Total</span>
-                    <span>${total.toFixed(2)}</span>
+                    <span>Rs {total.toFixed(2)}</span>
                   </Box>
                 </Box>
 
@@ -662,27 +660,14 @@ export default function CashSales() {
       {/* Invoice Dialog */}
       <Dialog open={showInvoice} onClose={() => setShowInvoice(false)} maxWidth="md" fullWidth>
         <DialogTitle className="flex items-center justify-between">
-          <span>MRA Fiscalized Invoice</span>
+          <span>Sales Invoice</span>
           <IconButton onClick={() => setShowInvoice(false)}>
             <Close />
           </IconButton>
         </DialogTitle>
         <DialogContent>
           {invoiceData && (
-            <div className="space-y-4">
-              {invoiceData.success ? (
-                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <Typography variant="body2" className="text-green-800 font-medium">
-                    ✓ Invoice successfully fiscalized with MRA
-                  </Typography>
-                </div>
-              ) : (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <Typography variant="body2" className="text-red-800 font-medium">
-                    ✗ Fiscalization failed: {invoiceData.error}
-                  </Typography>
-                </div>
-              )}
+            <div className="space-y-4" id="invoice-print-area">
 
               <Grid container spacing={2}>
                 <Grid item xs={6}>
@@ -772,48 +757,39 @@ export default function CashSales() {
               <div className="space-y-1">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span>${invoiceData.subtotal.toFixed(2)}</span>
+                  <span>Rs {invoiceData.subtotal.toFixed(2)}</span>
                 </div>
                 {invoiceData.discount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Discount</span>
-                    <span>-${invoiceData.discount.toFixed(2)}</span>
+                    <span>-Rs {invoiceData.discount.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <span>Tax (15%)</span>
-                  <span>${invoiceData.tax.toFixed(2)}</span>
-                </div>
                 <div className="flex justify-between text-lg font-semibold">
                   <span>Total</span>
-                  <span>${invoiceData.total.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <Divider />
-
-              <div>
-                <Typography variant="subtitle2" className="font-semibold mb-2">
-                  Send to Customer
-                </Typography>
-                <div className="flex gap-2">
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Customer Phone (WhatsApp)"
-                    placeholder="+230 5 123 4567"
-                    value={""}
-                    onChange={() => {}}
-                  />
-                  <Button variant="outlined" startIcon={<Close />} disabled size="small">
-                    Send
-                  </Button>
+                  <span>Rs {invoiceData.total.toFixed(2)}</span>
                 </div>
               </div>
             </div>
           )}
         </DialogContent>
         <DialogActions>
+          <Button 
+            variant="outlined" 
+            onClick={() => {
+              const printContent = document.getElementById('invoice-print-area')
+              const windowPrint = window.open('', '', 'width=800,height=600')
+              windowPrint.document.write('<html><head><title>Invoice</title>')
+              windowPrint.document.write('<style>body{font-family:Arial,sans-serif;padding:20px}@media print{body{padding:0}}</style>')
+              windowPrint.document.write('</head><body>')
+              windowPrint.document.write(printContent.innerHTML)
+              windowPrint.document.write('</body></html>')
+              windowPrint.document.close()
+              windowPrint.print()
+            }}
+          >
+            Print Invoice
+          </Button>
           <Button variant="contained" onClick={handleCompleteSale}>
             Complete Sale
           </Button>

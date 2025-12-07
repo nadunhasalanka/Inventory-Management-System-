@@ -204,7 +204,7 @@ export default function CreditPayments() {
 
               <Autocomplete
                 options={customersWithDebt}
-                getOptionLabel={(customer) => `${customer.name} - $${(customer.current_balance || 0).toFixed(2)}`}
+                getOptionLabel={(customer) => `${customer.name} - Rs ${(customer.current_balance || 0).toFixed(2)}`}
                 value={selectedCustomer}
                 onChange={(e, newValue) => setSelectedCustomer(newValue)}
                 inputValue={customerSearch}
@@ -217,8 +217,8 @@ export default function CreditPayments() {
                     <Box sx={{ width: '100%' }}>
                       <Typography variant="body1">{customer.name}</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Balance: ${(customer.current_balance || 0).toFixed(2)} | 
-                        Limit: ${(customer.credit_limit || 0).toFixed(2)}
+                        Balance: Rs {(customer.current_balance || 0).toFixed(2)} | 
+                        Limit: Rs {(customer.credit_limit || 0).toFixed(2)}
                       </Typography>
                     </Box>
                   </li>
@@ -232,13 +232,13 @@ export default function CreditPayments() {
                     icon={selectedCustomer.current_balance > selectedCustomer.credit_limit * 0.8 ? <WarningIcon /> : <CheckCircleIcon />}
                   >
                     <Typography variant="body2">
-                      <strong>Current Balance:</strong> ${(selectedCustomer.current_balance || 0).toFixed(2)}
+                      <strong>Current Balance:</strong> Rs {(selectedCustomer.current_balance || 0).toFixed(2)}
                     </Typography>
                     <Typography variant="body2">
-                      <strong>Credit Limit:</strong> ${(selectedCustomer.credit_limit || 0).toFixed(2)}
+                      <strong>Credit Limit:</strong> Rs {(selectedCustomer.credit_limit || 0).toFixed(2)}
                     </Typography>
                     <Typography variant="body2">
-                      <strong>Available Credit:</strong> ${Math.max(0, (selectedCustomer.credit_limit || 0) - (selectedCustomer.current_balance || 0)).toFixed(2)}
+                      <strong>Available Credit:</strong> Rs {Math.max(0, (selectedCustomer.credit_limit || 0) - (selectedCustomer.current_balance || 0)).toFixed(2)}
                     </Typography>
                   </Alert>
 
@@ -297,13 +297,13 @@ export default function CreditPayments() {
                               {new Date(order.order_date || order.createdAt).toLocaleDateString()}
                             </TableCell>
                             <TableCell align="right">
-                              ${(order.subtotal_snapshot || 0).toFixed(2)}
+                              Rs {(order.subtotal_snapshot || 0).toFixed(2)}
                             </TableCell>
                             <TableCell align="right">
-                              ${(order.amount_paid_cash || 0).toFixed(2)}
+                              Rs {(order.amount_paid_cash || 0).toFixed(2)}
                             </TableCell>
                             <TableCell align="right">
-                              <strong>${(order.credit_outstanding || 0).toFixed(2)}</strong>
+                              <strong>Rs {(order.credit_outstanding || 0).toFixed(2)}</strong>
                             </TableCell>
                             <TableCell>
                               {order.due_date ? (
@@ -358,7 +358,7 @@ export default function CreditPayments() {
                 <strong>Customer:</strong> {selectedCustomer?.name}
               </Typography>
               <Typography variant="body2">
-                <strong>Total Outstanding Balance:</strong> ${(selectedCustomer?.current_balance || 0).toFixed(2)}
+                <strong>Total Outstanding Balance:</strong> Rs {(selectedCustomer?.current_balance || 0).toFixed(2)}
               </Typography>
             </Alert>
 
@@ -391,7 +391,7 @@ export default function CreditPayments() {
                       label={
                         <Box>
                           <Typography variant="body2">
-                            {order.order_number} - Outstanding: ${(order.credit_outstanding || 0).toFixed(2)}
+                            {order.order_number} - Outstanding: Rs {(order.credit_outstanding || 0).toFixed(2)}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
                             Date: {new Date(order.order_date || order.createdAt).toLocaleDateString()}
@@ -411,7 +411,7 @@ export default function CreditPayments() {
               value={paymentAmount}
               onChange={(e) => setPaymentAmount(e.target.value)}
               InputProps={{
-                startAdornment: <Typography sx={{ mr: 1 }}>$</Typography>,
+                startAdornment: <Typography sx={{ mr: 1 }}>Rs</Typography>,
               }}
               inputProps={{ 
                 min: 0, 
@@ -422,9 +422,9 @@ export default function CreditPayments() {
 
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
               {paymentType === "full" ? (
-                <>Remaining customer balance after payment: ${Math.max(0, (selectedCustomer?.current_balance || 0) - parseFloat(paymentAmount || 0)).toFixed(2)}</>
+                <>Remaining customer balance after payment: Rs {Math.max(0, (selectedCustomer?.current_balance || 0) - parseFloat(paymentAmount || 0)).toFixed(2)}</>
               ) : (
-                <>Remaining order balance after payment: ${Math.max(0, (selectedOrder?.credit_outstanding || 0) - parseFloat(paymentAmount || 0)).toFixed(2)}</>
+                <>Remaining order balance after payment: Rs {Math.max(0, (selectedOrder?.credit_outstanding || 0) - parseFloat(paymentAmount || 0)).toFixed(2)}</>
               )}
             </Typography>
           </Box>

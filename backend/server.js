@@ -27,6 +27,7 @@ try {
 }
 const checkoutRoutes = require('./routes/checkout.routes');
 const notificationRoutes = require('./routes/notification.routes');
+const analyticsRoutes = require('./routes/analytics.routes');
 const { startEmailScheduler } = require('./jobs/emailScheduler');
 
 const app = express();
@@ -104,6 +105,9 @@ app.use('/api/checkout', checkoutRoutes);
 
 // Notification routes (email reminders)
 app.use('/api/notifications', notificationRoutes);
+
+// Analytics routes (admin dashboard, transaction logs, payments)
+app.use('/api/analytics', analyticsRoutes);
 
 
 // 1. Catch 404 - If a request reaches here, no route handled it

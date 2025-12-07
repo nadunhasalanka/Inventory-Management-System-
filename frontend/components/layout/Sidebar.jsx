@@ -103,16 +103,42 @@ export default function Sidebar({ currentUser, tabs, active, onSelect, mobileOpe
         <Box sx={{ width: "100%", overflow: "auto" }}>
           <Toolbar />
 
-          {/* Header with collapse/expand */}
-          <div className="px-2">
-            <div className="flex items-center justify-end mb-2" style={{ minHeight: 64, paddingRight: 12 }}>
-              <Tooltip title={collapsed ? "Expand" : "Collapse"}>
+          {/* User Info Card - Only when expanded */}
+          {!collapsed && (
+            <div className="px-3 py-3 mb-3 mx-2 bg-accent rounded-xl">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-accent-foreground truncate">
+                    {currentUser?.name || "User"}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {currentUser?.email || ""}
+                  </div>
+                </div>
+                <Tooltip title="Collapse">
+                  <IconButton size="small" onClick={toggleCollapsed} sx={{ ml: 1 }}>
+                    <ChevronLeft />
+                  </IconButton>
+                </Tooltip>
+              </div>
+              <div className="mt-2">
+                <span className="text-xs px-2 py-1 bg-primary text-primary-foreground rounded-full">
+                  {currentUser?.role || "User"}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Expand button - Only when collapsed */}
+          {collapsed && (
+            <div className="flex items-center justify-center mb-3" style={{ minHeight: 48 }}>
+              <Tooltip title="Expand">
                 <IconButton size="small" onClick={toggleCollapsed}>
-                  {collapsed ? <ChevronRight /> : <ChevronLeft />}
+                  <ChevronRight />
                 </IconButton>
               </Tooltip>
             </div>
-          </div>
+          )}
 
           {/* Nav list */}
           <List dense>

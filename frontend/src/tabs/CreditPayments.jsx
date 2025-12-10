@@ -194,10 +194,14 @@ export default function CreditPayments() {
   return (
     <>
       <Section title="Credit Payments" breadcrumbs={["Home", "Sales", "Credit Payments"]}>
-        <Grid container spacing={2}>
+        <div style={{ 
+          display: 'flex', 
+          gap: '16px',
+          flexWrap: 'wrap'
+        }}>
           
-          {/* Customer Selection - LEFT SIDE */}
-          <Grid item xs={12} md={4}>
+          {/* Customer Selection - LEFT COLUMN */}
+          <div style={{ width: '350px', flexShrink: 0 }}>
             <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005', height: '100%' }}>
               <CardContent sx={{ p: 2.5, display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -260,10 +264,10 @@ export default function CreditPayments() {
               )}
             </CardContent>
           </Card>
-        </Grid>
+        </div>
 
-        {/* Outstanding Orders - RIGHT SIDE */}
-        <Grid item xs={12} md={8}>
+        {/* Outstanding Orders - RIGHT COLUMN */}
+        <div style={{ flex: 1, minWidth: '500px' }}>
           <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
             <CardContent sx={{ p: 2.5 }}>
               <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 2 }}>
@@ -350,8 +354,8 @@ export default function CreditPayments() {
               )}
             </CardContent>
           </Card>
-        </Grid>
-      </Grid>
+        </div>
+      </div>
       </Section>
 
       {/* Payment Dialog */}

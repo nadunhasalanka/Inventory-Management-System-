@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   Box,
-  Grid,
   Card,
   CardContent,
   Typography,
@@ -13,75 +12,61 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   Chip,
   LinearProgress,
   IconButton,
-  Tooltip,
-  Button
+  Paper,
+  Divider
 } from '@mui/material';
 import {
   TrendingUp,
   TrendingDown,
   People,
   Warning,
-  ShoppingCart,
-  BarChart as BarChartIcon,
-  Inventory as InventoryIcon,
   AttachMoney,
   LocalShipping,
-  SwapHoriz,
-  Refresh
+  Refresh,
+  Inventory2,
+  ShoppingCart,
+  AccountBalance,
+  PointOfSale
 } from '@mui/icons-material';
 import { Section } from '../../components/common';
 import api from '../../utils/api';
 
-const KPICard = ({ title, value, subtitle, icon: Icon, trend, color = 'primary' }) => {
+const StatCard = ({ title, value, subtitle, icon: Icon, trend, color = 'primary' }) => {
   const isPositive = trend && parseFloat(trend) > 0;
   const isNegative = trend && parseFloat(trend) < 0;
 
   return (
     <Card sx={{ height: '100%' }}>
-      <CardContent>
+      <CardContent sx={{ p: 2 }}>
         <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-          <Box>
-            <Typography color="textSecondary" variant="body2" gutterBottom>
+          <Box flex={1}>
+            <Typography color="textSecondary" variant="caption" sx={{ fontWeight: 600, fontSize: '0.75rem', textTransform: 'uppercase' }}>
               {title}
             </Typography>
-            <Typography variant="h4" component="div" sx={{ mb: 1 }}>
+            <Typography variant="h5" sx={{ my: 0.5, fontWeight: 700 }}>
               {value}
             </Typography>
             {subtitle && (
-              <Typography variant="body2" color="textSecondary">
+              <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.7rem' }}>
                 {subtitle}
               </Typography>
             )}
             {trend && (
-              <Box display="flex" alignItems="center" mt={1}>
-                {isPositive && <TrendingUp fontSize="small" color="success" />}
-                {isNegative && <TrendingDown fontSize="small" color="error" />}
-                <Typography
-                  variant="body2"
-                  color={isPositive ? 'success.main' : isNegative ? 'error.main' : 'textSecondary'}
-                  sx={{ ml: 0.5 }}
-                >
-                  {trend}% vs last month
+              <Box display="flex" alignItems="center" mt={0.5}>
+                {isPositive ? <TrendingUp sx={{ fontSize: 16, color: 'success.main', mr: 0.5 }} /> : 
+                 <TrendingDown sx={{ fontSize: 16, color: 'error.main', mr: 0.5 }} />}
+                <Typography variant="caption" color={isPositive ? 'success.main' : 'error.main'} sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
+                  {trend}%
                 </Typography>
               </Box>
             )}
           </Box>
           {Icon && (
-            <Box
-              sx={{
-                bgcolor: `${color}.light`,
-                borderRadius: 2,
-                p: 1.5,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <Icon sx={{ color: `${color}.main`, fontSize: 32 }} />
+            <Box sx={{ bgcolor: `${color}.light`, borderRadius: 1, p: 1, display: 'flex' }}>
+              <Icon sx={{ color: `${color}.main`, fontSize: 28 }} />
             </Box>
           )}
         </Box>
@@ -93,29 +78,49 @@ const KPICard = ({ title, value, subtitle, icon: Icon, trend, color = 'primary' 
 const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [dashboardData, setDashboardData] = useState(null);
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  const [kpis, setKpis] = useState({
+    totalSales: { value: 0, count: 0, change: 0 },
+    totalCustomers: { value: 0 },
+    lowStockItems: { value: 0 },
+    pendingOrders: { value: 0 }
+  });
+  const [revenueByCategory, setRevenueByCategory] = useState([]);
+  const [topProducts, setTopProducts] = useState([]);
+  const [salesTrend, setSalesTrend] = useState([]);
+  const [recentActivity, setRecentActivity] = useState([]);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       const response = await api.get('/analytics/dashboard');
-      setDashboardData(response.data.data);
+      const { kpis, revenueByCategory, topProducts, salesTrend, recentActivity } = response.data;
+
+      setKpis(kpis || {
+        totalSales: { value: 0, count: 0, change: 0 },
+        totalCustomers: { value: 0 },
+        lowStockItems: { value: 0 },
+        pendingOrders: { value: 0 }
+      });
+      setRevenueByCategory(revenueByCategory || []);
+      setTopProducts(topProducts || []);
+      setSalesTrend(salesTrend || []);
+      setRecentActivity(recentActivity || []);
       setError(null);
     } catch (err) {
-      console.error('Failed to fetch dashboard data:', err);
-      setError(err.response?.data?.message || 'Failed to load dashboard data');
+      console.error('Error fetching dashboard data:', err);
+      setError('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
   if (loading) {
     return (
-      <Section title="Admin Dashboard">
+      <Section>
         <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
           <CircularProgress />
         </Box>
@@ -125,313 +130,377 @@ const AdminDashboard = () => {
 
   if (error) {
     return (
-      <Section title="Admin Dashboard">
-        <Alert severity="error">{error}</Alert>
+      <Section>
+        <Alert severity="error" action={
+          <IconButton size="small" onClick={fetchDashboardData}>
+            <Refresh />
+          </IconButton>
+        }>
+          {error}
+        </Alert>
       </Section>
     );
   }
 
-  const { kpis, revenueByCategory, topProducts, salesTrend, recentActivity } = dashboardData;
-
-  const refreshData = () => {
-    fetchDashboardData();
-  };
-
-  return (
-    <Section 
-      title="Admin Dashboard" 
-      right={
-        <Tooltip title="Refresh Data">
-          <IconButton onClick={refreshData} color="primary">
+  // Safety check for kpis data structure
+  if (!kpis || !kpis.totalSales) {
+    return (
+      <Section>
+        <Alert severity="warning" action={
+          <IconButton size="small" onClick={fetchDashboardData}>
             <Refresh />
           </IconButton>
-        </Tooltip>
-      }
-    >
-      {/* KPI Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} lg={3}>
-          <KPICard
-            title="Total Sales (This Month)"
-            value={`$${kpis.totalSales.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            subtitle={`${kpis.totalSales.count} orders`}
-            icon={ShoppingCart}
-            trend={kpis.totalSales.change}
+        }>
+          No dashboard data available. Click refresh to try again.
+        </Alert>
+      </Section>
+    );
+  }
+
+  const totalRevenue = revenueByCategory.reduce((sum, cat) => sum + cat.total, 0);
+
+  return (
+    <Section>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h5" fontWeight="700">
+          Admin Dashboard
+        </Typography>
+        <IconButton size="small" onClick={fetchDashboardData}>
+          <Refresh />
+        </IconButton>
+      </Box>
+
+      {/* KPI Cards Row */}
+      <Box display="flex" gap={2} mb={2} sx={{ flexWrap: 'wrap' }}>
+        <Box flex="1 1 calc(25% - 16px)" minWidth="200px">
+          <StatCard
+            title="Total Sales"
+            value={`Rs ${((kpis?.totalSales?.value || 0) / 1000).toFixed(1)}K`}
+            subtitle={`${kpis?.totalSales?.count || 0} orders`}
+            icon={AttachMoney}
+            trend={kpis?.totalSales?.change}
             color="success"
           />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <KPICard
-            title="Active Customers"
-            value={kpis.totalCustomers.value}
-            subtitle="Registered customers"
+        </Box>
+        <Box flex="1 1 calc(25% - 16px)" minWidth="200px">
+          <StatCard
+            title="Customers"
+            value={kpis?.totalCustomers?.value || 0}
+            subtitle="Active"
             icon={People}
             color="info"
           />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <KPICard
-            title="Low Stock Alerts"
-            value={kpis.lowStockItems.value}
-            subtitle="Below reorder level"
+        </Box>
+        <Box flex="1 1 calc(25% - 16px)" minWidth="200px">
+          <StatCard
+            title="Low Stock"
+            value={kpis?.lowStockItems?.value || 0}
+            subtitle="Alerts"
             icon={Warning}
             color="warning"
           />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <KPICard
-            title="Pending Orders"
-            value={kpis.pendingOrders.value}
-            subtitle="Awaiting processing"
-            icon={BarChartIcon}
-            color="primary"
+        </Box>
+        <Box flex="1 1 calc(25% - 16px)" minWidth="200px">
+          <StatCard
+            title="Pending"
+            value={kpis?.pendingOrders?.value || 0}
+            subtitle="Orders"
+            icon={LocalShipping}
+            color="error"
           />
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
-      {/* Sales Trend & Revenue Charts */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        {/* Sales Trend */}
-        <Grid item xs={12} lg={8}>
-          <Card sx={{ height: '100%' }}>
+      {/* Main Content: Sales Trend + Revenue Distribution */}
+      <Box display="flex" gap={2} mb={2} sx={{ flexWrap: 'wrap' }}>
+        {/* Sales Trend Table - 60% */}
+        <Box flex="1 1 60%" minWidth="400px">
+          <Card>
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">
-                  Sales Trend (Last 7 Days)
+                <Typography variant="h6" fontWeight="600">
+                  7-Day Sales Trend
                 </Typography>
                 <Chip 
-                  icon={<AttachMoney />}
-                  label={`Total: $${salesTrend.reduce((sum, day) => sum + day.sales, 0).toFixed(2)}`} 
+                  label={`Total: Rs ${(salesTrend.reduce((sum, day) => sum + day.sales, 0) / 1000).toFixed(1)}K`} 
                   color="success" 
-                  variant="outlined"
+                  size="small"
                 />
               </Box>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell><strong>Date</strong></TableCell>
-                      <TableCell align="center"><strong>Orders</strong></TableCell>
-                      <TableCell align="right"><strong>Sales Amount</strong></TableCell>
-                      <TableCell align="right"><strong>Avg Order Value</strong></TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {salesTrend.map((day) => (
-                      <TableRow key={day._id} hover>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {new Date(day._id).toLocaleDateString('en-US', { 
-                              weekday: 'short', 
-                              month: 'short', 
-                              day: 'numeric' 
-                            })}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Chip label={day.orders} size="small" />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="body2" fontWeight="medium" color="success.main">
-                            ${day.sales.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="body2" color="text.secondary">
-                            ${(day.sales / day.orders).toFixed(2)}
-                          </Typography>
-                        </TableCell>
+              <Divider sx={{ mb: 2 }} />
+              {salesTrend.length === 0 ? (
+                <Typography variant="body2" color="textSecondary" align="center" py={3}>
+                  No sales data available
+                </Typography>
+              ) : (
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 600 }}>Orders</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>Revenue</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>Avg Order</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>Growth</TableCell>
                       </TableRow>
-                    ))}
-                    <TableRow sx={{ bgcolor: 'action.hover' }}>
-                      <TableCell><strong>Total</strong></TableCell>
-                      <TableCell align="center">
-                        <Chip 
-                          label={salesTrend.reduce((sum, day) => sum + day.orders, 0)} 
-                          color="primary"
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" fontWeight="bold" color="success.main">
-                          ${salesTrend.reduce((sum, day) => sum + day.sales, 0).toFixed(2)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" fontWeight="bold">
-                          ${(salesTrend.reduce((sum, day) => sum + day.sales, 0) / 
-                             salesTrend.reduce((sum, day) => sum + day.orders, 0)).toFixed(2)}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                    </TableHead>
+                    <TableBody>
+                      {salesTrend.map((day, index) => {
+                        const prevDay = index > 0 ? salesTrend[index - 1] : null;
+                        const growth = prevDay ? ((day.sales - prevDay.sales) / prevDay.sales * 100).toFixed(1) : 0;
+                        const avgOrder = day.orders > 0 ? (day.sales / day.orders).toFixed(0) : 0;
+                        
+                        return (
+                          <TableRow key={day._id} hover>
+                            <TableCell>
+                              {new Date(day._id).toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' })}
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip label={day.orders} size="small" color="primary" variant="outlined" />
+                            </TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600, color: 'success.main' }}>
+                              Rs {(day.sales / 1000).toFixed(1)}K
+                            </TableCell>
+                            <TableCell align="right">
+                              Rs {avgOrder}
+                            </TableCell>
+                            <TableCell align="right">
+                              {prevDay ? (
+                                <Chip 
+                                  label={`${growth > 0 ? '+' : ''}${growth}%`}
+                                  size="small"
+                                  color={growth > 0 ? 'success' : growth < 0 ? 'error' : 'default'}
+                                  icon={growth > 0 ? <TrendingUp /> : <TrendingDown />}
+                                />
+                              ) : '-'}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
 
-        {/* Revenue by Category */}
-        <Grid item xs={12} lg={4}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Revenue by Category
-              </Typography>
-              <Typography variant="caption" color="text.secondary" display="block" mb={2}>
-                Last 30 Days
-              </Typography>
-              {revenueByCategory.map((cat, index) => {
-                const maxRevenue = Math.max(...revenueByCategory.map(c => c.revenue));
-                const percentage = (cat.revenue / maxRevenue) * 100;
-                return (
-                  <Box key={cat._id} mb={2}>
-                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
-                      <Typography variant="body2" fontWeight="medium">
-                        {cat._id || 'Uncategorized'}
-                      </Typography>
-                      <Typography variant="body2" color="success.main" fontWeight="bold">
-                        ${cat.revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                      </Typography>
-                    </Box>
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={percentage} 
-                      sx={{ height: 8, borderRadius: 1 }}
-                      color={index === 0 ? "success" : index === 1 ? "primary" : "secondary"}
-                    />
-                    <Typography variant="caption" color="text.secondary">
-                      {percentage.toFixed(0)}% of top category
-                    </Typography>
-                  </Box>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Top Products & Recent Activity */}
-      <Grid container spacing={3}>
-        {/* Top Products */}
-        <Grid item xs={12} lg={6}>
+        {/* Revenue by Category - 40% */}
+        <Box flex="1 1 35%" minWidth="300px">
           <Card>
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">
-                  Top Selling Products
+                <Typography variant="h6" fontWeight="600">
+                  Revenue Distribution
                 </Typography>
-                <Chip label="Last 30 Days" size="small" variant="outlined" />
+                <Chip 
+                  icon={<AccountBalance />} 
+                  label={`Rs ${(totalRevenue / 1000).toFixed(1)}K`} 
+                  color="primary" 
+                  size="small" 
+                />
               </Box>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell><strong>Rank</strong></TableCell>
-                      <TableCell><strong>Product</strong></TableCell>
-                      <TableCell align="center"><strong>Qty Sold</strong></TableCell>
-                      <TableCell align="right"><strong>Revenue</strong></TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {topProducts.map((product, index) => (
-                      <TableRow key={product._id} hover>
-                        <TableCell>
-                          <Chip 
-                            label={`#${index + 1}`} 
-                            size="small"
-                            color={index === 0 ? "success" : index === 1 ? "primary" : "default"}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" fontWeight="medium">
-                            {product.name}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Typography variant="body2" color="primary">
-                            {product.totalQuantity}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="body2" color="success.main" fontWeight="medium">
-                            ${product.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                          </Typography>
-                        </TableCell>
+              <Divider sx={{ mb: 2 }} />
+              {revenueByCategory.length === 0 ? (
+                <Typography variant="body2" color="textSecondary" align="center" py={3}>
+                  No revenue data available
+                </Typography>
+              ) : (
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>Amount</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>%</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                    </TableHead>
+                    <TableBody>
+                      {revenueByCategory.map((category) => {
+                        const percentage = totalRevenue > 0 ? ((category.total / totalRevenue) * 100).toFixed(1) : 0;
+                        return (
+                          <TableRow key={category._id} hover>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={500}>
+                                {category._id || 'Uncategorized'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body2" color="success.main" fontWeight={600}>
+                                Rs {(category.total / 1000).toFixed(1)}K
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Chip 
+                                label={`${percentage}%`} 
+                                size="small" 
+                                variant="outlined"
+                                color="primary"
+                              />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
             </CardContent>
           </Card>
-        </Grid>
+        </Box>
+      </Box>
 
-        {/* Recent Activity */}
-        <Grid item xs={12} lg={6}>
+      {/* Bottom Row: Top Products + Recent Activity */}
+      <Box display="flex" gap={2} sx={{ flexWrap: 'wrap' }}>
+        {/* Top Products - 50% */}
+        <Box flex="1 1 48%" minWidth="400px">
           <Card>
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">
-                  Recent System Activity
+                <Typography variant="h6" fontWeight="600">
+                  Top 10 Products
                 </Typography>
-                <Chip label="Last 10 Actions" size="small" variant="outlined" />
+                <Chip icon={<PointOfSale />} label={topProducts.length} color="primary" size="small" />
               </Box>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell><strong>Action</strong></TableCell>
-                      <TableCell><strong>Collection</strong></TableCell>
-                      <TableCell><strong>User</strong></TableCell>
-                      <TableCell align="right"><strong>Time</strong></TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {recentActivity.map((log) => (
-                      <TableRow key={log._id} hover>
-                        <TableCell>
-                          <Chip
-                            label={log.action}
-                            size="small"
-                            color={
-                              log.action === 'CREATE'
-                                ? 'success'
-                                : log.action === 'DELETE'
-                                ? 'error'
-                                : log.action === 'UPDATE'
-                                ? 'warning'
-                                : 'info'
-                            }
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="caption">
-                            {log.collection_name}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {log.user_id?.name || 'Unknown'}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="caption" color="text.secondary">
-                            {new Date(log.timestamp).toLocaleTimeString('en-US', {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </Typography>
-                        </TableCell>
+              <Divider sx={{ mb: 2 }} />
+              {topProducts.length === 0 ? (
+                <Typography variant="body2" color="textSecondary" align="center" py={3}>
+                  No product data available
+                </Typography>
+              ) : (
+                <TableContainer component={Paper} variant="outlined">
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 600 }}>#</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Product</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 600 }}>Sold</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>Revenue</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>Avg Price</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                    </TableHead>
+                    <TableBody>
+                      {topProducts.slice(0, 10).map((product, index) => {
+                        const avgPrice = product.totalQuantity > 0 ? (product.totalRevenue / product.totalQuantity).toFixed(0) : 0;
+                        return (
+                          <TableRow key={product._id} hover>
+                            <TableCell>
+                              <Chip 
+                                label={index + 1} 
+                                size="small" 
+                                color={index === 0 ? 'success' : index === 1 ? 'info' : 'default'}
+                                sx={{ width: 30 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={500}>
+                                {product.name}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip 
+                                label={product.totalQuantity} 
+                                size="small" 
+                                color="primary" 
+                                variant="outlined"
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body2" color="success.main" fontWeight={600}>
+                                Rs {(product.totalRevenue / 1000).toFixed(1)}K
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body2">
+                                Rs {avgPrice}
+                              </Typography>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
             </CardContent>
           </Card>
-        </Grid>
-      </Grid>
+        </Box>
+
+        {/* Recent Activity - 50% */}
+        <Box flex="1 1 48%" minWidth="400px">
+          <Card>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6" fontWeight="600">
+                  Recent Activity (10)
+                </Typography>
+                <Chip icon={<Inventory2 />} label={recentActivity.length} color="secondary" size="small" />
+              </Box>
+              <Divider sx={{ mb: 2 }} />
+              {recentActivity.length === 0 ? (
+                <Typography variant="body2" color="textSecondary" align="center" py={3}>
+                  No recent activity
+                </Typography>
+              ) : (
+                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400 }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 600 }}>Action</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Product</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 600 }}>Qty</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>Time</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {recentActivity.slice(0, 10).map((log, index) => (
+                        <TableRow key={index} hover>
+                          <TableCell>
+                            <Chip 
+                              label={log.transaction_type} 
+                              size="small" 
+                              color={log.transaction_type === 'IN' ? 'success' : 'error'}
+                              sx={{ minWidth: 60 }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">
+                              {log.product_id?.name || 'N/A'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Typography variant="body2" fontWeight={600}>
+                              {log.quantity}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="caption">
+                              {log.user_id 
+                                ? `${log.user_id.first_name || ''} ${log.user_id.last_name || ''}`.trim() 
+                                  || log.user_id.username 
+                                  || log.user_id.email
+                                : 'System'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="caption" color="text.secondary">
+                              {new Date(log.timestamp).toLocaleTimeString('en-US', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </CardContent>
+          </Card>
+        </Box>
+      </Box>
     </Section>
   );
 };

@@ -116,53 +116,47 @@ const TransactionLogs = () => {
   };
 
   return (
-    <Section title="Transaction Logs">
+    <Section title="Transaction Logs" breadcrumbs={["Home", "Inventory", "Transaction Logs"]}>
       {/* Filters */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>
             Filters
           </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                fullWidth
-                label="Start Date"
-                type="date"
-                value={filters.startDate}
-                onChange={handleFilterChange('startDate')}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                fullWidth
-                label="End Date"
-                type="date"
-                value={filters.endDate}
-                onChange={handleFilterChange('endDate')}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                fullWidth
-                select
-                label="Transaction Type"
-                value={filters.type}
-                onChange={handleFilterChange('type')}
-              >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="IN">IN - Goods Received</MenuItem>
-                <MenuItem value="OUT">OUT - Goods Shipped</MenuItem>
-                <MenuItem value="ADJUST">ADJUST - Stock Adjustment</MenuItem>
-                <MenuItem value="TRANSFER">TRANSFER - Location Transfer</MenuItem>
-                <MenuItem value="RETURN">RETURN - Customer Return</MenuItem>
-                <MenuItem value="ASSEMBLY_IN">ASSEMBLY_IN - Finished Good</MenuItem>
-                <MenuItem value="ASSEMBLY_OUT">ASSEMBLY_OUT - Components Used</MenuItem>
-              </TextField>
-            </Grid>
-          </Grid>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <TextField
+              label="Start Date"
+              type="date"
+              value={filters.startDate}
+              onChange={handleFilterChange('startDate')}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: '200px' }}
+            />
+            <TextField
+              label="End Date"
+              type="date"
+              value={filters.endDate}
+              onChange={handleFilterChange('endDate')}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: '200px' }}
+            />
+            <TextField
+              select
+              label="Transaction Type"
+              value={filters.type}
+              onChange={handleFilterChange('type')}
+              sx={{ width: '250px' }}
+            >
+              <MenuItem value="">All Types</MenuItem>
+              <MenuItem value="IN">IN - Goods Received</MenuItem>
+              <MenuItem value="OUT">OUT - Goods Shipped</MenuItem>
+              <MenuItem value="ADJUST">ADJUST - Stock Adjustment</MenuItem>
+              <MenuItem value="TRANSFER">TRANSFER - Location Transfer</MenuItem>
+              <MenuItem value="RETURN">RETURN - Customer Return</MenuItem>
+              <MenuItem value="ASSEMBLY_IN">ASSEMBLY_IN - Finished Good</MenuItem>
+              <MenuItem value="ASSEMBLY_OUT">ASSEMBLY_OUT - Components Used</MenuItem>
+            </TextField>
+          </Box>
         </CardContent>
       </Card>
 
@@ -171,7 +165,7 @@ const TransactionLogs = () => {
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
-              Summary
+              Summary by Transaction Type
             </Typography>
             <Grid container spacing={2}>
               {summary.map((stat) => (
@@ -191,6 +185,9 @@ const TransactionLogs = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Transactions Table */}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       {/* Transactions Table */}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -246,12 +243,23 @@ const TransactionLogs = () => {
                       {tx.quantity_delta > 0 ? '+' : ''}{tx.quantity_delta}
                     </TableCell>
                     <TableCell align="right">{tx.balance_after}</TableCell>
-                    <TableCell>{tx.user_id?.name || 'Unknown'}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {tx.user_id 
+                          ? `${tx.user_id.first_name || ''} ${tx.user_id.last_name || ''}`.trim() || tx.user_id.username || tx.user_id.email
+                          : 'System'}
+                      </Typography>
+                      {tx.user_id?.email && (
+                        <Typography variant="caption" color="textSecondary">
+                          {tx.user_id.email}
+                        </Typography>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {tx.source_type}
                       <br />
                       <Typography variant="caption" color="textSecondary">
-                        ${tx.cost_at_time_of_tx?.toFixed(2)}
+                        ${tx.cost_at_time_of_tx?.toFixed(2) || '0.00'}
                       </Typography>
                     </TableCell>
                   </TableRow>

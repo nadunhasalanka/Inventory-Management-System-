@@ -86,7 +86,7 @@ export default function AppLayout({ children }) {
         />
         <Box component="main" sx={{ flexGrow: 1, p: 3, height: "100vh", overflow: "auto" }} className="bg-background">
           <Toolbar />
-          <div className="max-w-[1400px] mx-auto">{children}</div>
+          {children}
         </Box>
       </Box>
     </CurrentUserContext.Provider>

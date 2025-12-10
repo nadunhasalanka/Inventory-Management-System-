@@ -1,601 +1,427 @@
-"use client"
-
-import { useState, useMemo } from "react"
-import { Section } from "../components/common"
+import { useEffect, useState } from 'react';
 import {
+  Box,
   Card,
   CardContent,
-  Typography,
-  Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
+  Typography,
+  CircularProgress,
+  Alert,
+  TextField,
+  MenuItem,
+  Grid,
   Chip,
-  Tabs,
-  Tab,
-  Box,
-  Button,
-  ButtonGroup,
-} from "@mui/material"
-import { TrendingUp, TrendingDown, ShoppingCart, Category, CalendarToday, CompareArrows } from "@mui/icons-material"
+  Paper,
+  Divider,
+  IconButton
+} from '@mui/material';
 import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RTooltip,
-  Legend,
-  PieChart,
-  Pie,
-  Cell,
-  AreaChart,
-  Area,
-} from "recharts"
+  TrendingUp,
+  TrendingDown,
+  AttachMoney,
+  ShoppingCart,
+  Refresh,
+  AccountBalance,
+  CreditCard
+} from '@mui/icons-material';
+import { Section } from '../components/common';
+import api from '../utils/api';
 
-const COLORS = ["#10b981", "#a78bfa", "#22c55e", "#f59e0b", "#ef4444", "#06b6d4", "#8b5cf6"]
+const SalesAnalytics = () => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [sales, setSales] = useState([]);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 0,
+    pages: 0,
+    limit: 50
+  });
+  const [analytics, setAnalytics] = useState({
+    totalRevenue: 0,
+    totalOrders: 0,
+    averageOrderValue: 0,
+    cashSales: 0,
+    creditSales: 0,
+    paidOrders: 0,
+    pendingOrders: 0
+  });
+  const [breakdown, setBreakdown] = useState([]);
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    paymentStatus: '',
+    saleType: ''
+  });
 
-export default function SalesAnalytics() {
-  const [period, setPeriod] = useState("month")
-  const [tabValue, setTabValue] = useState(0)
-  const [comparisonView, setComparisonView] = useState("daily")
+  useEffect(() => {
+    fetchSalesData();
+  }, [pagination.page, pagination.limit, filters]);
 
-  // Load sales data
-  const cashSales = useMemo(() => {
-    const saved = localStorage.getItem("cash-sales")
-    return saved ? JSON.parse(saved) : []
-  }, [])
+  const fetchSalesData = async () => {
+    try {
+      setLoading(true);
+      const params = {
+        page: pagination.page + 1,
+        limit: pagination.limit,
+        ...filters
+      };
 
-  const creditSales = useMemo(() => {
-    const saved = localStorage.getItem("credit-sales")
-    return saved ? JSON.parse(saved) : []
-  }, [])
+      // Remove empty filters
+      Object.keys(params).forEach(key => {
+        if (params[key] === '') delete params[key];
+      });
 
-  const allSales = useMemo(() => [...cashSales, ...creditSales], [cashSales, creditSales])
+      const response = await api.get('/analytics/sales', { params });
+      setSales(response.data.data.sales);
+      setPagination(prev => ({
+        ...prev,
+        total: response.data.data.pagination.total,
+        pages: response.data.data.pagination.pages
+      }));
+      setAnalytics(response.data.data.analytics);
+      setBreakdown(response.data.data.breakdown || []);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to fetch sales data:', err);
+      setError(err.response?.data?.message || 'Failed to load sales data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Filter by period
-  const filteredSales = useMemo(() => {
-    const now = new Date()
-    let startDate
+  const handleChangePage = (event, newPage) => {
+    setPagination(prev => ({ ...prev, page: newPage }));
+  };
 
-    switch (period) {
-      case "today":
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        break
-      case "week":
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-        break
-      case "month":
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
-        break
-      case "quarter":
-        startDate = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
-        break
-      case "year":
-        startDate = new Date(now.getFullYear(), 0, 1)
-        break
+  const handleChangeRowsPerPage = (event) => {
+    setPagination(prev => ({
+      ...prev,
+      limit: parseInt(event.target.value, 10),
+      page: 0
+    }));
+  };
+
+  const handleFilterChange = (field) => (event) => {
+    setFilters(prev => ({
+      ...prev,
+      [field]: event.target.value
+    }));
+    setPagination(prev => ({ ...prev, page: 0 }));
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Paid':
+        return 'success';
+      case 'Pending Credit':
+        return 'warning';
+      case 'Partially Paid':
+        return 'info';
+      case 'Cancelled':
+        return 'error';
       default:
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        return 'default';
     }
+  };
 
-    return allSales.filter((sale) => new Date(sale.date) >= startDate)
-  }, [allSales, period])
-
-  // Calculate key metrics
-  const metrics = useMemo(() => {
-    const totalRevenue = filteredSales.reduce((sum, sale) => sum + (sale.total || 0), 0)
-    const totalTransactions = filteredSales.length
-    const avgTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0
-
-    // Calculate previous period for comparison
-    const now = new Date()
-    let prevStartDate, prevEndDate
-
-    switch (period) {
-      case "today":
-        prevStartDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
-        prevEndDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        break
-      case "week":
-        prevStartDate = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
-        prevEndDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-        break
-      case "month":
-        prevStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-        prevEndDate = new Date(now.getFullYear(), now.getMonth(), 1)
-        break
-      default:
-        prevStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-        prevEndDate = new Date(now.getFullYear(), now.getMonth(), 1)
-    }
-
-    const prevSales = allSales.filter((sale) => {
-      const saleDate = new Date(sale.date)
-      return saleDate >= prevStartDate && saleDate < prevEndDate
-    })
-
-    const prevRevenue = prevSales.reduce((sum, sale) => sum + (sale.total || 0), 0)
-    const revenueChange = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : 0
-
-    const prevTransactions = prevSales.length
-    const transactionChange =
-      prevTransactions > 0 ? ((totalTransactions - prevTransactions) / prevTransactions) * 100 : 0
-
-    return {
-      totalRevenue,
-      totalTransactions,
-      avgTransaction,
-      revenueChange,
-      transactionChange,
-      prevRevenue,
-      prevTransactions,
-    }
-  }, [filteredSales, allSales, period])
-
-  // Sales by Product
-  const productSales = useMemo(() => {
-    const products = {}
-
-    filteredSales.forEach((sale) => {
-      ;(sale.items || []).forEach((item) => {
-        if (!products[item.sku]) {
-          products[item.sku] = {
-            sku: item.sku,
-            name: item.name,
-            category: item.category || "Uncategorized",
-            quantity: 0,
-            revenue: 0,
-            transactions: 0,
-          }
-        }
-        products[item.sku].quantity += item.quantity
-        products[item.sku].revenue += item.price * item.quantity
-        products[item.sku].transactions++
-      })
-    })
-
-    return Object.values(products).sort((a, b) => b.revenue - a.revenue)
-  }, [filteredSales])
-
-  // Sales by Category
-  const categorySales = useMemo(() => {
-    const categories = {}
-
-    filteredSales.forEach((sale) => {
-      ;(sale.items || []).forEach((item) => {
-        const category = item.category || "Uncategorized"
-        if (!categories[category]) {
-          categories[category] = {
-            name: category,
-            revenue: 0,
-            quantity: 0,
-          }
-        }
-        categories[category].revenue += item.price * item.quantity
-        categories[category].quantity += item.quantity
-      })
-    })
-
-    return Object.values(categories).sort((a, b) => b.revenue - a.revenue)
-  }, [filteredSales])
-
-  // Time-based trends
-  const trendData = useMemo(() => {
-    const trends = {}
-
-    filteredSales.forEach((sale) => {
-      let key
-      const saleDate = new Date(sale.date)
-
-      switch (comparisonView) {
-        case "hourly":
-          key = `${saleDate.getHours()}:00`
-          break
-        case "daily":
-          key = saleDate.toLocaleDateString()
-          break
-        case "weekly":
-          const weekStart = new Date(saleDate)
-          weekStart.setDate(saleDate.getDate() - saleDate.getDay())
-          key = weekStart.toLocaleDateString()
-          break
-        case "monthly":
-          key = `${saleDate.getFullYear()}-${String(saleDate.getMonth() + 1).padStart(2, "0")}`
-          break
-        default:
-          key = saleDate.toLocaleDateString()
-      }
-
-      if (!trends[key]) {
-        trends[key] = {
-          period: key,
-          revenue: 0,
-          transactions: 0,
-          cashSales: 0,
-          creditSales: 0,
-        }
-      }
-
-      trends[key].revenue += sale.total || 0
-      trends[key].transactions++
-
-      if (sale.type === "credit" || sale.invoiceNumber?.includes("CREDIT")) {
-        trends[key].creditSales += sale.total || 0
-      } else {
-        trends[key].cashSales += sale.total || 0
-      }
-    })
-
-    return Object.values(trends).sort((a, b) => a.period.localeCompare(b.period))
-  }, [filteredSales, comparisonView])
-
-  // Comparison data (current vs previous period)
-  const comparisonData = useMemo(() => {
-    const now = new Date()
-    const data = []
-
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
-      const dateStr = date.toLocaleDateString()
-
-      const currentSales = filteredSales.filter((sale) => new Date(sale.date).toLocaleDateString() === dateStr)
-
-      const prevDate = new Date(date.getTime() - 7 * 24 * 60 * 60 * 1000)
-      const prevDateStr = prevDate.toLocaleDateString()
-      const prevSales = allSales.filter((sale) => new Date(sale.date).toLocaleDateString() === prevDateStr)
-
-      data.push({
-        date: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-        current: currentSales.reduce((sum, sale) => sum + (sale.total || 0), 0),
-        previous: prevSales.reduce((sum, sale) => sum + (sale.total || 0), 0),
-      })
-    }
-
-    return data
-  }, [filteredSales, allSales])
+  const StatCard = ({ title, value, subtitle, icon: Icon, color = 'primary', trend }) => (
+    <Card>
+      <CardContent>
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+          <Box flex={1}>
+            <Typography variant="body2" color="textSecondary" gutterBottom sx={{ fontWeight: 600 }}>
+              {title}
+            </Typography>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: `${color}.main` }}>
+              {value}
+            </Typography>
+            {subtitle && (
+              <Typography variant="caption" color="textSecondary">
+                {subtitle}
+              </Typography>
+            )}
+            {trend && (
+              <Box display="flex" alignItems="center" mt={0.5}>
+                {trend > 0 ? <TrendingUp sx={{ fontSize: 16, color: 'success.main', mr: 0.5 }} /> : 
+                 <TrendingDown sx={{ fontSize: 16, color: 'error.main', mr: 0.5 }} />}
+                <Typography variant="caption" color={trend > 0 ? 'success.main' : 'error.main'} sx={{ fontWeight: 600 }}>
+                  {trend > 0 ? '+' : ''}{trend}%
+                </Typography>
+              </Box>
+            )}
+          </Box>
+          {Icon && (
+            <Box sx={{ bgcolor: `${color}.light`, borderRadius: 1, p: 1, display: 'flex' }}>
+              <Icon sx={{ color: `${color}.main`, fontSize: 32 }} />
+            </Box>
+          )}
+        </Box>
+      </CardContent>
+    </Card>
+  );
 
   return (
-    <Section title="Sales Analytics" breadcrumbs={["Reports", "Sales Analytics"]}>
-      <div className="flex justify-between items-center mb-4">
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>Period</InputLabel>
-          <Select value={period} label="Period" onChange={(e) => setPeriod(e.target.value)}>
-            <MenuItem value="today">Today</MenuItem>
-            <MenuItem value="week">This Week</MenuItem>
-            <MenuItem value="month">This Month</MenuItem>
-            <MenuItem value="quarter">This Quarter</MenuItem>
-            <MenuItem value="year">This Year</MenuItem>
-          </Select>
-        </FormControl>
-      </div>
+    <Section title="Sales Analytics" breadcrumbs={["Home", "Sales", "Analytics"]}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h5" fontWeight="700">
+          Sales Overview
+        </Typography>
+        <IconButton size="small" onClick={fetchSalesData}>
+          <Refresh />
+        </IconButton>
+      </Box>
 
-      {/* Key Metrics */}
-      <Grid container spacing={3} className="mb-4">
+      {/* Analytics Summary Cards */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Typography variant="body2" color="text.secondary">
-                    Total Revenue
-                  </Typography>
-                  <Typography variant="h5" className="font-bold mt-1">
-                    Rs {metrics.totalRevenue.toFixed(2)}
-                  </Typography>
-                </div>
-                <ShoppingCart className="text-green-500" fontSize="large" />
-              </div>
-              <div className="flex items-center gap-1 mt-2">
-                {metrics.revenueChange >= 0 ? (
-                  <TrendingUp className="text-green-500" fontSize="small" />
-                ) : (
-                  <TrendingDown className="text-red-500" fontSize="small" />
-                )}
-                <Typography variant="caption" color={metrics.revenueChange >= 0 ? "success" : "error"}>
-                  {Math.abs(metrics.revenueChange).toFixed(1)}% vs previous period
-                </Typography>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Total Revenue"
+            value={`Rs ${(analytics.totalRevenue / 1000).toFixed(1)}K`}
+            subtitle={`${analytics.totalOrders} orders`}
+            icon={AttachMoney}
+            color="success"
+          />
         </Grid>
-
         <Grid item xs={12} sm={6} md={3}>
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Typography variant="body2" color="text.secondary">
-                    Transactions
-                  </Typography>
-                  <Typography variant="h5" className="font-bold mt-1">
-                    {metrics.totalTransactions}
-                  </Typography>
-                </div>
-                <CalendarToday className="text-purple-500" fontSize="large" />
-              </div>
-              <div className="flex items-center gap-1 mt-2">
-                {metrics.transactionChange >= 0 ? (
-                  <TrendingUp className="text-green-500" fontSize="small" />
-                ) : (
-                  <TrendingDown className="text-red-500" fontSize="small" />
-                )}
-                <Typography variant="caption" color={metrics.transactionChange >= 0 ? "success" : "error"}>
-                  {Math.abs(metrics.transactionChange).toFixed(1)}% vs previous period
-                </Typography>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Average Order Value"
+            value={`Rs ${analytics.averageOrderValue?.toFixed(0) || 0}`}
+            subtitle="Per transaction"
+            icon={ShoppingCart}
+            color="info"
+          />
         </Grid>
-
         <Grid item xs={12} sm={6} md={3}>
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent>
-              <Typography variant="body2" color="text.secondary">
-                Avg Transaction
-              </Typography>
-              <Typography variant="h5" className="font-bold mt-1">
-                Rs {metrics.avgTransaction.toFixed(2)}
-              </Typography>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Cash Sales"
+            value={`Rs ${(analytics.cashSales / 1000).toFixed(1)}K`}
+            subtitle={`${((analytics.cashSales / analytics.totalRevenue) * 100 || 0).toFixed(1)}% of total`}
+            icon={AccountBalance}
+            color="primary"
+          />
         </Grid>
-
         <Grid item xs={12} sm={6} md={3}>
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent>
-              <Typography variant="body2" color="text.secondary">
-                Top Product
-              </Typography>
-              <Typography variant="h6" className="font-bold mt-1">
-                {productSales[0]?.name || "N/A"}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Rs {productSales[0]?.revenue.toFixed(2) || "0.00"} revenue
-              </Typography>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Credit Sales"
+            value={`Rs ${(analytics.creditSales / 1000).toFixed(1)}K`}
+            subtitle={`${((analytics.creditSales / analytics.totalRevenue) * 100 || 0).toFixed(1)}% of total`}
+            icon={CreditCard}
+            color="warning"
+          />
         </Grid>
       </Grid>
 
-      {/* Charts */}
-      <Grid container spacing={3} className="mb-4">
-        <Grid item xs={12} lg={8}>
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent>
-              <div className="flex items-center justify-between mb-3">
-                <Typography variant="h6">Sales Trends</Typography>
-                <ButtonGroup size="small">
-                  <Button
-                    variant={comparisonView === "daily" ? "contained" : "outlined"}
-                    onClick={() => setComparisonView("daily")}
-                  >
-                    Daily
-                  </Button>
-                  <Button
-                    variant={comparisonView === "weekly" ? "contained" : "outlined"}
-                    onClick={() => setComparisonView("weekly")}
-                  >
-                    Weekly
-                  </Button>
-                  <Button
-                    variant={comparisonView === "monthly" ? "contained" : "outlined"}
-                    onClick={() => setComparisonView("monthly")}
-                  >
-                    Monthly
-                  </Button>
-                </ButtonGroup>
-              </div>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trendData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="period" />
-                    <YAxis />
-                    <RTooltip />
-                    <Legend />
-                    <Area
-                      type="monotone"
-                      dataKey="cashSales"
-                      stackId="1"
-                      stroke="#22c55e"
-                      fill="#22c55e"
-                      name="Cash Sales"
+      {/* Payment Status Breakdown */}
+      {breakdown.length > 0 && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom fontWeight={600}>
+              Revenue Breakdown by Status
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+            <Grid container spacing={2}>
+              {breakdown.map((item) => (
+                <Grid item xs={6} sm={4} md={2.4} key={item._id}>
+                  <Box textAlign="center" p={1}>
+                    <Chip 
+                      label={item._id} 
+                      color={getStatusColor(item._id)} 
+                      size="small" 
+                      sx={{ mb: 1 }}
                     />
-                    <Area
-                      type="monotone"
-                      dataKey="creditSales"
-                      stackId="1"
-                      stroke="#10b981"
-                      fill="#10b981"
-                      name="Credit Sales"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </Grid>
+                    <Typography variant="h6" fontWeight={600}>
+                      {item.count}
+                    </Typography>
+                    <Typography variant="caption" color="textSecondary">
+                      orders
+                    </Typography>
+                    <Typography variant="body2" color="success.main" fontWeight={600} mt={0.5}>
+                      Rs {(item.totalRevenue / 1000).toFixed(1)}K
+                    </Typography>
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
+          </CardContent>
+        </Card>
+      )}
 
-        <Grid item xs={12} lg={4}>
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent>
-              <Typography variant="h6" className="mb-3">
-                Sales by Category
-              </Typography>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categorySales}
-                      dataKey="revenue"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      label={(entry) => entry.name}
-                    >
-                      {categorySales.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <RTooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Week-over-Week Comparison */}
-      <Card className="rounded-2xl shadow-sm mb-4">
+      {/* Filters */}
+      <Card sx={{ mb: 3 }}>
         <CardContent>
-          <div className="flex items-center gap-2 mb-3">
-            <CompareArrows className="text-green-500" />
-            <Typography variant="h6">Week-over-Week Comparison</Typography>
-          </div>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={comparisonData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <RTooltip />
-                <Legend />
-                <Line type="monotone" dataKey="current" stroke="#10b981" strokeWidth={2} name="This Week" />
-                <Line
-                  type="monotone"
-                  dataKey="previous"
-                  stroke="#94a3b8"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  name="Last Week"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <Typography variant="h6" gutterBottom fontWeight={600}>
+            Filters
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <TextField
+              label="Start Date"
+              type="date"
+              value={filters.startDate}
+              onChange={handleFilterChange('startDate')}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: '200px' }}
+            />
+            <TextField
+              label="End Date"
+              type="date"
+              value={filters.endDate}
+              onChange={handleFilterChange('endDate')}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: '200px' }}
+            />
+            <TextField
+              select
+              label="Payment Status"
+              value={filters.paymentStatus}
+              onChange={handleFilterChange('paymentStatus')}
+              sx={{ width: '200px' }}
+            >
+              <MenuItem value="">All Status</MenuItem>
+              <MenuItem value="Paid">Paid</MenuItem>
+              <MenuItem value="Pending Credit">Pending Credit</MenuItem>
+              <MenuItem value="Partially Paid">Partially Paid</MenuItem>
+              <MenuItem value="Cancelled">Cancelled</MenuItem>
+            </TextField>
+            <TextField
+              select
+              label="Sale Type"
+              value={filters.saleType}
+              onChange={handleFilterChange('saleType')}
+              sx={{ width: '200px' }}
+            >
+              <MenuItem value="">All Types</MenuItem>
+              <MenuItem value="cash">Cash Sales</MenuItem>
+              <MenuItem value="credit">Credit Sales</MenuItem>
+            </TextField>
+          </Box>
         </CardContent>
       </Card>
 
-      {/* Detailed Tables */}
-      <Card className="rounded-2xl shadow-sm">
-        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-          <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)}>
-            <Tab label="Top Products" icon={<ShoppingCart />} iconPosition="start" />
-            <Tab label="Category Performance" icon={<Category />} iconPosition="start" />
-          </Tabs>
+      {/* Sales Table */}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <CircularProgress />
         </Box>
-
-        {tabValue === 0 && (
-          <TableContainer>
+      ) : (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom fontWeight={600}>
+              Recent Sales Transactions
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+          </CardContent>
+          <TableContainer component={Paper}>
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Rank</TableCell>
-                  <TableCell>Product</TableCell>
-                  <TableCell>Category</TableCell>
-                  <TableCell align="right">Qty Sold</TableCell>
-                  <TableCell align="right">Revenue</TableCell>
-                  <TableCell align="right">Transactions</TableCell>
-                  <TableCell align="right">Avg Sale</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Order #</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Customer</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>Items</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>Total</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>Paid</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Payment Method</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {productSales.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} align="center">
-                      <Typography variant="body2" color="text.secondary" className="py-8">
-                        No sales data available for this period
+                {sales.map((sale) => (
+                  <TableRow key={sale._id} hover>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={600}>
+                        {sale.order_number}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {new Date(sale.created_at).toLocaleDateString()}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        {new Date(sale.created_at).toLocaleTimeString('en-US', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {sale.customer_id?.name || 'N/A'}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        {sale.customer_id?.email || ''}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={sale.sale_type === 'cash' ? 'Cash' : 'Credit'}
+                        color={sale.sale_type === 'cash' ? 'primary' : 'warning'}
+                        size="small"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Chip 
+                        label={sale.items?.length || 0} 
+                        size="small" 
+                        color="default"
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body2" fontWeight={600}>
+                        Rs {sale.total_amount?.toFixed(2) || '0.00'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body2" color="success.main" fontWeight={600}>
+                        Rs {sale.paid_amount?.toFixed(2) || '0.00'}
+                      </Typography>
+                      {sale.credit_outstanding > 0 && (
+                        <Typography variant="caption" color="error.main">
+                          Due: Rs {sale.credit_outstanding?.toFixed(2)}
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={sale.payment_status}
+                        color={getStatusColor(sale.payment_status)}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {sale.payment_method || 'N/A'}
                       </Typography>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  productSales.slice(0, 20).map((product, index) => (
-                    <TableRow key={product.sku}>
-                      <TableCell>
-                        <Chip
-                          label={`#${index + 1}`}
-                          size="small"
-                          color={index < 3 ? "primary" : "default"}
-                          variant={index < 3 ? "filled" : "outlined"}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{product.name}</div>
-                          <div className="text-xs text-gray-500">{product.sku}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={product.category} size="small" />
-                      </TableCell>
-                      <TableCell align="right">{product.quantity}</TableCell>
-                      <TableCell align="right" className="font-semibold">
-                        Rs {product.revenue.toFixed(2)}
-                      </TableCell>
-                      <TableCell align="right">{product.transactions}</TableCell>
-                      <TableCell align="right">Rs {(product.revenue / product.transactions).toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))
-                )}
+                ))}
               </TableBody>
             </Table>
           </TableContainer>
-        )}
-
-        {tabValue === 1 && (
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Category</TableCell>
-                  <TableCell align="right">Items Sold</TableCell>
-                  <TableCell align="right">Revenue</TableCell>
-                  <TableCell align="right">% of Total</TableCell>
-                  <TableCell align="right">Avg Item Price</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {categorySales.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center">
-                      <Typography variant="body2" color="text.secondary" className="py-8">
-                        No sales data available for this period
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  categorySales.map((category) => (
-                    <TableRow key={category.name}>
-                      <TableCell className="font-medium">{category.name}</TableCell>
-                      <TableCell align="right">{category.quantity}</TableCell>
-                      <TableCell align="right" className="font-semibold">
-                        Rs {category.revenue.toFixed(2)}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Chip
-                          label={`${((category.revenue / metrics.totalRevenue) * 100).toFixed(1)}%`}
-                          size="small"
-                          color="primary"
-                        />
-                      </TableCell>
-                      <TableCell align="right">Rs {(category.revenue / category.quantity).toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </Card>
+          <TablePagination
+            component="div"
+            count={pagination.total}
+            page={pagination.page}
+            onPageChange={handleChangePage}
+            rowsPerPage={pagination.limit}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            rowsPerPageOptions={[25, 50, 100]}
+          />
+        </Card>
+      )}
     </Section>
-  )
-}
+  );
+};
+
+export default SalesAnalytics;

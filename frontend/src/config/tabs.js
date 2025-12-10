@@ -34,7 +34,7 @@ export const tabs = [
   { key: "indebted", label: "Indebted Clients", icon: <BalanceIcon />, path: "/indebted" },
   { key: "suppliers", label: "Suppliers", icon: <ShippingIcon />, path: "/suppliers" },
   { key: "transactions", label: "Transaction Logs", icon: <HistoryIcon />, path: "/transactions" },
-  { key: "payments", label: "All Payments", icon: <WalletIcon />, path: "/payments" },
+  { key: "payments", label: "Money Transactions", icon: <WalletIcon />, path: "/payments" },
   { key: "profile", label: "My Profile", icon: <AccountCircleIcon />, path: "/profile" },
   // Removed from sidebar per requirements:
   // { key: "todo", label: "To-Do List", icon: <ChecklistIcon />, path: "/todo" },

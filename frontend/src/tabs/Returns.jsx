@@ -146,10 +146,14 @@ export default function Returns() {
 
   return (
     <Section title="Returns & Refunds" breadcrumbs={["Home", "Sales", "Returns"]}>
-      <Grid container spacing={4}>
+      <div style={{ 
+        display: 'flex', 
+        gap: '16px',
+        flexWrap: 'wrap'
+      }}>
         
-        {/* Refund Summary - LEFT SIDE (md=5) */}
-        <Grid item xs={12} md={5} sx={{ order: { xs: 2, md: 1 } }}>
+        {/* Refund Summary - LEFT COLUMN */}
+        <div style={{ width: '400px', flexShrink: 0 }}>
           <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
@@ -326,10 +330,10 @@ export default function Returns() {
               </Box>
             </CardContent>
           </Card>
-        </Grid>
+        </div>
 
-        {/* Return Details & Items - RIGHT SIDE (md=7) */}
-        <Grid item xs={12} md={7} sx={{ order: { xs: 1, md: 2 } }}>
+        {/* Return Details & Items - RIGHT COLUMN */}
+        <div style={{ flex: 1, minWidth: '500px' }}>
           <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
@@ -415,9 +419,9 @@ export default function Returns() {
               </Box>
             </CardContent>
           </Card>
-        </Grid>
+        </div>
 
-      </Grid>
+      </div>
 
       {/* Recent Returns Table - FULL WIDTH */}
       <Box sx={{ mt: 4 }}>

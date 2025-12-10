@@ -292,22 +292,15 @@ export default function CashSales() {
   return (
     <>
       <Section title="Cash Sales" breadcrumbs={["Home", "Sales", "Cash"]}>
-        {/* <Grid container spacing={2} > */}
-        {/* <Grid 
-          container 
-          spacing={2}
-          sx={{ 
-            width: '100%',
-            maxWidth: '100%',
-            margin: 0,
-            '& > .MuiGrid-item': {
-              paddingLeft: '16px', // spacing={2} = 16px
-            }
-          }}
-        > */}
+        {/* TWO COLUMN FLEXBOX LAYOUT */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '16px',
+          flexWrap: 'wrap'
+        }}>
           
-          {/* Payment Summary - LEFT SIDE (md=4) */}
-          <Grid item xs={12} md={4} sx={{ order: { xs: 2, md: 1 } }}>
+          {/* Payment Summary - LEFT COLUMN */}
+          <div style={{ width: '350px', flexShrink: 0 }}>
             <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005', height: '100%' }}>
               <CardContent sx={{ p: 2.5, display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 2 }}>
@@ -491,10 +484,10 @@ export default function CashSales() {
                 </Box>
               </CardContent>
             </Card>
-          </Grid>
+          </div>
 
-          {/* Items Selection - RIGHT SIDE (md=8) */}
-          <Grid item xs={12} md={12} sx={{ order: { xs: 1, md: 2 } }}>
+          {/* Items Selection - RIGHT COLUMN */}
+          <div style={{ flex: 1, minWidth: '500px' }}>
           {/* <Grid sx={{ order: { xs: 1, md: 2 } }}> */}
             <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
               <CardContent sx={{ p: 2.5 }}>
@@ -660,10 +653,10 @@ export default function CashSales() {
                 </Box>
               </CardContent>
             </Card>
-          </Grid>
+          </div>
           
 
-        {/* </Grid> */}
+        </div>
       </Section>
 
       {/* Invoice Dialog */}

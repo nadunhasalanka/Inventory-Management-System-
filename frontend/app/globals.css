@@ -40,7 +40,7 @@
   --sidebar-ring: oklch(0.6 0.15 145 / 0.3);
 }
 
-html,
+/* html,
 body,
 #root {
   width: 100% !important;
@@ -48,7 +48,7 @@ body,
   height: 100%;
   margin: 0;
   padding: 0;
-}
+} */
 
 .dark {
   /* Updated dark mode with greenish theme */

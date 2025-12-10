@@ -289,14 +289,34 @@ export default function CashSales() {
 
   return (
     <>
-      {/* NEW CLEAN LAYOUT */}
       <Section title="Cash Sales" breadcrumbs={["Home", "Sales", "Cash"]}>
-        <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
-          <Grid container spacing={4}>
-          
-          {/* Payment Summary - LEFT SIDE (md=4) */}
-          <Grid item xs={12} md={4} sx={{ order: { xs: 2, md: 1 } }}>
-            <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
+        <div></div>
+      </Section>
+      
+      {/* TWO COLUMN LAYOUT - OUTSIDE SECTION */}
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'row',
+        gap: '20px',
+        backgroundColor: '#f0f0f0',
+        padding: '10px',
+        border: '2px solid red',
+        position: 'absolute',
+        top: '200px',
+        left: '320px',
+        right: '20px',
+        zIndex: 1000
+      }}>
+        
+        {/* LEFT COLUMN - Payment Summary */}
+        <div style={{ 
+          width: '350px',
+          minWidth: '350px',
+          maxWidth: '350px',
+          backgroundColor: 'yellow',
+          border: '2px solid blue'
+        }}>
+            <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005', width: '100%' }}>
               <CardContent sx={{ p: 3 }}>
                 <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
                   Payment Summary
@@ -344,7 +364,7 @@ export default function CashSales() {
                     <TextField
                       fullWidth
                       size="small"
-                      label="Customer Name (Optional)"
+                      label="Customer Name (Optional)" 
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       placeholder="Walk-in Customer"
@@ -477,10 +497,15 @@ export default function CashSales() {
                 </Box>
               </CardContent>
             </Card>
-          </Grid>
+          </div>
 
-          {/* Items Selection - RIGHT SIDE (md=8) */}
-          <Grid item xs={12} md={8} sx={{ order: { xs: 1, md: 2 } }}>
+          {/* RIGHT COLUMN - Products */}
+          <div style={{ 
+            flex: '1',
+            backgroundColor: 'lightgreen',
+            border: '2px solid green',
+            minWidth: '400px'
+          }}>
             <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
               <CardContent sx={{ p: 3 }}>
                 <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
@@ -652,10 +677,9 @@ export default function CashSales() {
                 </Box>
               </CardContent>
             </Card>
-          </Grid>
+          </div>
 
-        </Grid>
-        </Box>
+        </div>
       </Section>
       {/* Invoice Dialog */}
       <Dialog open={showInvoice} onClose={() => setShowInvoice(false)} maxWidth="md" fullWidth>

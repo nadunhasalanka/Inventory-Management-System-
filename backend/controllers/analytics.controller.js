@@ -164,7 +164,7 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
     const recentActivity = await AuditLog.find()
         .sort({ timestamp: -1 })
         .limit(10)
-        .populate('user_id', 'name email')
+        .populate('user_id', 'first_name last_name email username')
         .lean();
 
     res.json({
@@ -229,7 +229,7 @@ exports.getTransactionLog = asyncHandler(async (req, res) => {
         .limit(parseInt(limit))
         .populate('product_id', 'sku name')
         .populate('location_id', 'location_name')
-        .populate('user_id', 'name email')
+        .populate('user_id', 'first_name last_name email username')
         .lean();
 
     const total = await Transaction.countDocuments(match);
@@ -354,3 +354,172 @@ exports.getAllPayments = asyncHandler(async (req, res) => {
         }
     });
 });
+
+// @route   GET /api/analytics/sales-summary
+// @desc    Get sales analytics summary (total sales, profit, payment breakdown)
+exports.getSalesSummary = asyncHandler(async (req, res) => {
+    const { startDate, endDate } = req.query;
+
+    const match = {
+        status: { $in: ['Paid', 'Pending Credit', 'Partially Paid', 'Delivered', 'Shipped'] }
+    };
+
+    if (startDate || endDate) {
+        match.created_at = {};
+        if (startDate) match.created_at.$gte = new Date(startDate);
+        if (endDate) match.created_at.$lte = new Date(endDate);
+    }
+
+    // Get all sales orders with line items
+    const salesOrders = await SalesOrder.find(match).lean();
+
+    let totalSales = 0;
+    let cashSales = 0;
+    let creditSales = 0;
+    let totalCost = 0;
+    let cashCount = 0;
+    let creditCount = 0;
+
+    for (const order of salesOrders) {
+        const orderTotal = order.grand_total || 0;
+        totalSales += orderTotal;
+
+        // Count as cash if payment_status is Paid, otherwise credit
+        if (order.payment_status === 'Paid') {
+            cashSales += orderTotal;
+            cashCount++;
+        } else {
+            creditSales += orderTotal;
+            creditCount++;
+        }
+
+        // Calculate cost from line items
+        if (order.line_items && Array.isArray(order.line_items)) {
+            for (const item of order.line_items) {
+                const product = await Product.findById(item.product_id).lean();
+                if (product && product.cost_price) {
+                    totalCost += product.cost_price * item.quantity;
+                }
+            }
+        }
+    }
+
+    const totalProfit = totalSales - totalCost;
+    const totalOrders = salesOrders.length;
+
+    res.json({
+        success: true,
+        data: {
+            totalSales: Number(totalSales.toFixed(2)),
+            cashSales: Number(cashSales.toFixed(2)),
+            creditSales: Number(creditSales.toFixed(2)),
+            totalProfit: Number(totalProfit.toFixed(2)),
+            totalCost: Number(totalCost.toFixed(2)),
+            totalOrders,
+            cashCount,
+            creditCount
+        }
+    });
+});
+
+// @route   GET /api/analytics/sales
+// @desc    Get all sales with analytics
+exports.getAllSales = asyncHandler(async (req, res) => {
+    const {
+        startDate,
+        endDate,
+        paymentStatus,
+        saleType,
+        page = 1,
+        limit = 50
+    } = req.query;
+
+    const match = {};
+
+    // Date filter
+    if (startDate || endDate) {
+        match.created_at = {};
+        if (startDate) match.created_at.$gte = new Date(startDate);
+        if (endDate) match.created_at.$lte = new Date(endDate);
+    }
+
+    // Payment status filter
+    if (paymentStatus) match.payment_status = paymentStatus;
+
+    // Sale type filter
+    if (saleType) match.sale_type = saleType;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Fetch sales with pagination
+    const sales = await SalesOrder.find(match)
+        .populate('customer_id', 'name email phone')
+        .sort({ created_at: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean();
+
+    const total = await SalesOrder.countDocuments(match);
+
+    // Calculate analytics
+    const analyticsData = await SalesOrder.aggregate([
+        { $match: match },
+        {
+            $group: {
+                _id: null,
+                totalRevenue: { $sum: '$total_amount' },
+                totalOrders: { $sum: 1 },
+                cashSales: {
+                    $sum: {
+                        $cond: [{ $eq: ['$sale_type', 'cash'] }, '$total_amount', 0]
+                    }
+                },
+                creditSales: {
+                    $sum: {
+                        $cond: [{ $eq: ['$sale_type', 'credit'] }, '$total_amount', 0]
+                    }
+                }
+            }
+        }
+    ]);
+
+    const analytics = analyticsData[0] || {
+        totalRevenue: 0,
+        totalOrders: 0,
+        cashSales: 0,
+        creditSales: 0
+    };
+
+    analytics.averageOrderValue = analytics.totalOrders > 0 
+        ? analytics.totalRevenue / analytics.totalOrders 
+        : 0;
+
+    // Payment status breakdown
+    const breakdown = await SalesOrder.aggregate([
+        { $match: match },
+        {
+            $group: {
+                _id: '$payment_status',
+                count: { $sum: 1 },
+                totalRevenue: { $sum: '$total_amount' }
+            }
+        },
+        { $sort: { totalRevenue: -1 } }
+    ]);
+
+    res.json({
+        success: true,
+        data: {
+            sales,
+            pagination: {
+                total,
+                page: parseInt(page),
+                pages: Math.ceil(total / parseInt(limit)),
+                limit: parseInt(limit)
+            },
+            analytics,
+            breakdown
+        }
+    });
+});
+

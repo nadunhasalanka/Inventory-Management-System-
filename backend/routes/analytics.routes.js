@@ -26,4 +26,18 @@ router.get(
     analyticsController.getAllPayments
 );
 
+router.get(
+    '/sales-summary',
+    protect,
+    authorize('Admin'),
+    analyticsController.getSalesSummary
+);
+
+router.get(
+    '/sales',
+    protect,
+    authorize('Admin'),
+    analyticsController.getAllSales
+);
+
 module.exports = router;

@@ -259,10 +259,14 @@ export default function CreditSales() {
   return (
     <>
       <Section title="Credit Sales" breadcrumbs={["Home", "Sales", "Credit"]}>
-        <Grid container spacing={2}>
+        <div style={{ 
+          display: 'flex', 
+          gap: '16px',
+          flexWrap: 'wrap'
+        }}>
         
-        {/* Payment Summary - LEFT SIDE (md=4) */}
-        <Grid item xs={12} md={4} sx={{ order: { xs: 2, md: 1 } }}>
+        {/* Payment Summary - LEFT COLUMN */}
+        <div style={{ width: '350px', flexShrink: 0 }}>
           <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005', height: '100%' }}>
             <CardContent sx={{ p: 2.5, display: 'flex', flexDirection: 'column', height: '100%' }}>
               <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 2 }}>
@@ -493,10 +497,10 @@ export default function CreditSales() {
               </Box>
             </CardContent>
           </Card>
-        </Grid>
+        </div>
 
-        {/* Select Items - RIGHT SIDE (md=8) */}
-        <Grid item xs={12} md={8} sx={{ order: { xs: 1, md: 2 } }}>
+        {/* Items Selection - RIGHT COLUMN */}
+        <div style={{ flex: 1, minWidth: '500px' }}>
           <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
             <CardContent sx={{ p: 2.5 }}>
               <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 2 }}>
@@ -659,9 +663,9 @@ export default function CreditSales() {
               </Box>
             </CardContent>
           </Card>
-        </Grid>
+        </div>
 
-      </Grid>
+      </div>
       </Section>
 
       <Dialog open={showNewCustomer} onClose={() => setShowNewCustomer(false)} maxWidth="sm" fullWidth>

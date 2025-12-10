@@ -38,8 +38,7 @@ const AllPayments = () => {
     startDate: '',
     endDate: '',
     method: '',
-    type: '',
-    entityType: ''
+    type: ''
   });
 
   useEffect(() => {
@@ -52,6 +51,7 @@ const AllPayments = () => {
       const params = {
         page: pagination.page + 1, // API uses 1-based indexing
         limit: pagination.limit,
+        entityType: 'SalesOrder', // Only show sales orders (customer transactions)
         ...filters
       };
 
@@ -116,16 +116,16 @@ const AllPayments = () => {
   };
 
   return (
-    <Section title="All Payments">
+    <Section title="Money Transactions" breadcrumbs={["Home", "Sales", "Money Transactions"]}>
       {/* Summary Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} md={4}>
           <Card>
             <CardContent>
-              <Typography variant="h6" color="textSecondary" gutterBottom>
+              <Typography variant="body2" color="textSecondary" gutterBottom>
                 Total Collected
               </Typography>
-              <Typography variant="h3" color="success.main">
+              <Typography variant="h4" color="success.main" sx={{ fontWeight: 600 }}>
                 ${totalCollected.toFixed(2)}
               </Typography>
             </CardContent>
@@ -134,10 +134,10 @@ const AllPayments = () => {
         <Grid item xs={12} md={4}>
           <Card>
             <CardContent>
-              <Typography variant="h6" color="textSecondary" gutterBottom>
-                Total Payments
+              <Typography variant="body2" color="textSecondary" gutterBottom>
+                Total Transactions
               </Typography>
-              <Typography variant="h3" color="primary.main">
+              <Typography variant="h4" color="primary.main" sx={{ fontWeight: 600 }}>
                 {pagination.total}
               </Typography>
             </CardContent>
@@ -146,10 +146,10 @@ const AllPayments = () => {
         <Grid item xs={12} md={4}>
           <Card>
             <CardContent>
-              <Typography variant="h6" color="textSecondary" gutterBottom>
+              <Typography variant="body2" color="textSecondary" gutterBottom>
                 Average Payment
               </Typography>
-              <Typography variant="h3" color="info.main">
+              <Typography variant="h4" color="info.main" sx={{ fontWeight: 600 }}>
                 ${pagination.total > 0 ? (totalCollected / pagination.total).toFixed(2) : '0.00'}
               </Typography>
             </CardContent>
@@ -163,72 +163,49 @@ const AllPayments = () => {
           <Typography variant="h6" gutterBottom>
             Filters
           </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={2.4}>
-              <TextField
-                fullWidth
-                label="Start Date"
-                type="date"
-                value={filters.startDate}
-                onChange={handleFilterChange('startDate')}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2.4}>
-              <TextField
-                fullWidth
-                label="End Date"
-                type="date"
-                value={filters.endDate}
-                onChange={handleFilterChange('endDate')}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={2.4}>
-              <TextField
-                fullWidth
-                select
-                label="Payment Method"
-                value={filters.method}
-                onChange={handleFilterChange('method')}
-              >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="Cash">Cash</MenuItem>
-                <MenuItem value="Credit Card">Credit Card</MenuItem>
-                <MenuItem value="Debit Card">Debit Card</MenuItem>
-                <MenuItem value="Bank Transfer">Bank Transfer</MenuItem>
-                <MenuItem value="Check">Check</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2.4}>
-              <TextField
-                fullWidth
-                select
-                label="Payment Type"
-                value={filters.type}
-                onChange={handleFilterChange('type')}
-              >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="Customer Payment">Customer Payment</MenuItem>
-                <MenuItem value="Supplier Payment">Supplier Payment</MenuItem>
-                <MenuItem value="Refund">Refund</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2.4}>
-              <TextField
-                fullWidth
-                select
-                label="Entity Type"
-                value={filters.entityType}
-                onChange={handleFilterChange('entityType')}
-              >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="SalesOrder">Sales Order</MenuItem>
-                <MenuItem value="PurchaseOrder">Purchase Order</MenuItem>
-                <MenuItem value="ReturnsExchange">Returns/Exchange</MenuItem>
-              </TextField>
-            </Grid>
-          </Grid>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <TextField
+              label="Start Date"
+              type="date"
+              value={filters.startDate}
+              onChange={handleFilterChange('startDate')}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: '200px' }}
+            />
+            <TextField
+              label="End Date"
+              type="date"
+              value={filters.endDate}
+              onChange={handleFilterChange('endDate')}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: '200px' }}
+            />
+            <TextField
+              select
+              label="Payment Method"
+              value={filters.method}
+              onChange={handleFilterChange('method')}
+              sx={{ width: '200px' }}
+            >
+              <MenuItem value="">All Methods</MenuItem>
+              <MenuItem value="Cash">Cash</MenuItem>
+              <MenuItem value="Credit Card">Credit Card</MenuItem>
+              <MenuItem value="Debit Card">Debit Card</MenuItem>
+              <MenuItem value="Bank Transfer">Bank Transfer</MenuItem>
+              <MenuItem value="Check">Check</MenuItem>
+            </TextField>
+            <TextField
+              select
+              label="Transaction Type"
+              value={filters.type}
+              onChange={handleFilterChange('type')}
+              sx={{ width: '200px' }}
+            >
+              <MenuItem value="">All Types</MenuItem>
+              <MenuItem value="Customer Payment">Customer Payment</MenuItem>
+              <MenuItem value="Refund">Refund</MenuItem>
+            </TextField>
+          </Box>
         </CardContent>
       </Card>
 
@@ -241,12 +218,12 @@ const AllPayments = () => {
             </Typography>
             <Grid container spacing={2}>
               {summary.map((stat) => (
-                <Grid item xs={6} sm={4} md={2.4} key={stat._id}>
+                <Grid item xs={6} sm={4} md={2} key={stat._id}>
                   <Box textAlign="center">
                     <Typography variant="body2" color="textSecondary">
                       {stat._id}
                     </Typography>
-                    <Typography variant="h6">{stat.count}</Typography>
+                    <Typography variant="h6">{stat.count} txns</Typography>
                     <Typography variant="caption" color="success.main">
                       ${stat.totalAmount.toFixed(2)}
                     </Typography>
@@ -258,7 +235,7 @@ const AllPayments = () => {
         </Card>
       )}
 
-      {/* Payments Table */}
+      {/* Transactions Table */}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       {loading ? (
@@ -275,9 +252,8 @@ const AllPayments = () => {
                   <TableCell>Type</TableCell>
                   <TableCell>Method</TableCell>
                   <TableCell align="right">Amount</TableCell>
-                  <TableCell>Entity Type</TableCell>
-                  <TableCell>Customer/Supplier</TableCell>
-                  <TableCell>Reference</TableCell>
+                  <TableCell>Customer</TableCell>
+                  <TableCell>Order Number</TableCell>
                   <TableCell>Notes</TableCell>
                 </TableRow>
               </TableHead>
@@ -304,22 +280,15 @@ const AllPayments = () => {
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>
                       ${payment.amount.toFixed(2)}
                     </TableCell>
-                    <TableCell>{payment.entity_type}</TableCell>
                     <TableCell>
-                      {payment.entityDetails?.customer?.name ||
-                       payment.entityDetails?.supplier?.name ||
-                       'N/A'}
+                      {payment.entityDetails?.customer?.name || 'N/A'}
                       <br />
                       <Typography variant="caption" color="textSecondary">
-                        {payment.entityDetails?.customer?.email ||
-                         payment.entityDetails?.supplier?.contact_email ||
-                         ''}
+                        {payment.entityDetails?.customer?.email || ''}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      {payment.entityDetails?.orderNumber ||
-                       payment.entityDetails?.poNumber ||
-                       'N/A'}
+                      {payment.entityDetails?.orderNumber || 'N/A'}
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>

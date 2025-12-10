@@ -56,25 +56,25 @@ try {
     const salesOrderRoutes = require('../backend/routes/salesOrder.routes');
     const paymentRoutes = require('../backend/routes/payment.routes');
 
-    // Mount routes
-    app.use('/api/users', userRoutes);
-    app.use('/api/auth', authRoutes);
-    app.use('/api/products', productRoutes);
-    app.use('/api/categories', categoryRoutes);
-    app.use('/api/customers', customerRoutes);
-    app.use('/api/suppliers', supplierRoutes);
-    app.use('/api/locations', locationRoutes);
-    app.use('/api/inventory', inventoryRoutes);
-    app.use('/api/stock-transfers', stockTransferRoutes);
-    app.use('/api/purchase-orders', purchaseOrderRoutes);
-    app.use('/api/sales-orders', salesOrderRoutes);
-    app.use('/api/payments', paymentRoutes);
+    // Mount routes (no /api prefix needed - Vercel already routes /api/* to this function)
+    app.use('/users', userRoutes);
+    app.use('/auth', authRoutes);
+    app.use('/products', productRoutes);
+    app.use('/categories', categoryRoutes);
+    app.use('/customers', customerRoutes);
+    app.use('/suppliers', supplierRoutes);
+    app.use('/locations', locationRoutes);
+    app.use('/inventory', inventoryRoutes);
+    app.use('/stock-transfers', stockTransferRoutes);
+    app.use('/purchase-orders', purchaseOrderRoutes);
+    app.use('/sales-orders', salesOrderRoutes);
+    app.use('/payments', paymentRoutes);
 } catch (error) {
     console.error('Error loading routes:', error);
 }
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get('/health', (req, res) => {
     res.json({
         success: true,
         status: 'ok',

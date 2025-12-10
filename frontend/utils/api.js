@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'http://localhost:3001/api', 
+    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
     withCredentials: true
 });
 
@@ -17,10 +17,10 @@ api.interceptors.response.use(
             // Clear any stored user data
             if (typeof window !== 'undefined') {
                 localStorage.removeItem('current-user');
-                
+
                 // Get current path to avoid redirecting if already on login page
                 const currentPath = window.location.pathname;
-                
+
                 // Only redirect if not already on login page
                 if (currentPath !== '/login') {
                     // Redirect to login page
@@ -28,7 +28,7 @@ api.interceptors.response.use(
                 }
             }
         }
-        
+
         // Return the error for further handling
         return Promise.reject(error);
     }

@@ -45,7 +45,7 @@ app.use((req, res, next) => {
 app.use(cors({
     // This must be your exact frontend origin
     // We assume it's localhost:3000 for development
-    origin: 'http://localhost:3000', 
+    origin: 'http://localhost:3000',
     credentials: true // <-- Allows the browser to send cookies
 }));
 // Ensure preflight requests are handled
@@ -66,7 +66,7 @@ app.use('/api/auth', authRoutes);
 
 // --- Route Middleware ---
 app.use('/api/users', userRoutes);
- 
+
 // Product Routes
 app.use('/api/products', productRoutes);
 
@@ -132,19 +132,30 @@ app.use((err, req, res, next) => {
         error: {
             message: message,
             // Only send the stack trace in development mode for debugging
-            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined 
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
         }
     });
 });
 
+// Connect to database
 connectDB();
 
-// Start the server
-app.listen(PORT, () => {
-    console.log(`Server is running on : ${PORT}`);
-    
-    // Start email scheduler after server starts
-    startEmailScheduler().catch(err => {
-        console.error('Failed to start email scheduler:', err);
+// Start the server only in development (not on Vercel)
+if (process.env.VERCEL !== '1') {
+    // Local development
+    app.listen(PORT, () => {
+        console.log(`Server is running on : ${PORT}`);
+
+        // Start email scheduler after server starts
+        startEmailScheduler().catch(err => {
+            console.error('Failed to start email scheduler:', err);
+        });
     });
-});
+} else {
+    // On Vercel, just log that we're ready
+    console.log('Server configured for Vercel serverless');
+    // Email scheduler will run on-demand for serverless
+}
+
+// Export the Express app for Vercel
+module.exports = app;

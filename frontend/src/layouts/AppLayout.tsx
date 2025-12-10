@@ -10,11 +10,10 @@ import { CurrentUserContext } from "@/context/CurrentUserContext"
 // App layout for authenticated pages
 export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [currentUser, setCurrentUser] = useState(null)
+  const [currentUser, setCurrentUser] = useState<any>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
-  const pathname = location.pathname
 
   const refreshCurrentUser = useCallback(async () => {
     try {
@@ -48,7 +47,7 @@ export default function AppLayout() {
 
   const visibleTabs = useMemo(() => {
     if (!currentUser) return []
-    if ((currentUser.role || "").toLowerCase() === "admin") return allTabs
+    if (((currentUser as any).role || "").toLowerCase() === "admin") return allTabs
     return allTabs.filter((tab) => {
       const required = tabPermissions[tab.key]
       return hasPermission(required)
@@ -61,7 +60,7 @@ export default function AppLayout() {
     const tabForPath = allTabs.find(t => t.path === location.pathname)
     if (tabForPath) {
       const required = tabPermissions[tabForPath.key]
-      if ((currentUser.role || '').toLowerCase() !== 'admin' && !hasPermission(required)) {
+      if (((currentUser as any).role || '').toLowerCase() !== 'admin' && !hasPermission(required)) {
         const fallback = visibleTabs[0] || allTabs[0]
         if (fallback?.path && fallback.path !== location.pathname) {
           navigate(fallback.path, { replace: true })
@@ -74,13 +73,13 @@ export default function AppLayout() {
 
   return (
     <CurrentUserContext.Provider value={{ currentUser, setCurrentUser, refreshCurrentUser }}>
-      <Box sx={{ display: "flex", width: '100%', minHeight: '100vh', minWidth:0 }}>
+      <Box sx={{ display: "flex", width: '100%', minHeight: '100vh', minWidth: 0 }}>
         <TopBar onOpenSidebar={() => setMobileOpen(true)} currentUser={currentUser} onLogout={handleLogout} />
         <Sidebar
           currentUser={currentUser}
           tabs={visibleTabs}
           active={"dashboard"}
-          onSelect={() => {}}
+          onSelect={() => { }}
           mobileOpen={mobileOpen}
           onClose={() => setMobileOpen(false)}
         />

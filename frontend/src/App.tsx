@@ -3,7 +3,6 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import QueryProvider from './components/QueryProvider'
 
 // Import route components
-import RootLayout from './layouts/RootLayout'
 import AuthLayout from './layouts/AuthLayout'
 import AppLayout from './layouts/AppLayout'
 
@@ -43,7 +42,7 @@ function App() {
         <Routes>
           {/* Root redirect */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          
+
           {/* Public routes */}
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />

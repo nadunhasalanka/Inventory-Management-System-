@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Section } from "../components/common";
-import { Grid, Card, CardContent, TextField, FormControl, Select, MenuItem, InputLabel, Switch, Button, Typography } from "@mui/material";
+import { Grid, Card, CardContent, TextField, FormControl, Select, MenuItem, InputLabel, Switch, Button, Typography, Box, Divider } from "@mui/material";
 import { Save } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchCategories, createCategory as apiCreateCategory, createProduct as apiCreateProduct } from "../services/productApi";
@@ -28,7 +28,7 @@ export default function AddEditItem() {
     mutationFn: (payload) => apiCreateProduct(payload),
     onSuccess: () => {
       setValues({ sku: "", name: "", cost: 0, price: 0, category_id: "", allow_returns: true, is_active: true });
-      queryClient.invalidateQueries({ queryKey: ["inventory","summary"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory", "summary"] });
       alert("Product created successfully");
     },
     onError: (e) => alert(e?.response?.data?.message || "Failed to create product"),
@@ -63,62 +63,145 @@ export default function AddEditItem() {
           <span>Show Profit Preview</span>
           <Switch checked={showProfit} onChange={(e) => setShowProfit(e.target.checked)} />
         </div>
-  <Button variant="contained" startIcon={<Save />} onClick={onSave} disabled={createProduct.isPending}>Save Item</Button>
+        <Button variant="contained" startIcon={<Save />} onClick={onSave} disabled={createProduct.isPending}>Save Item</Button>
       </div>
     }>
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={8}>
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <TextField label="SKU / Item Code" value={values.sku} onChange={(e) => handle("sku", e.target.value)} />
-                <FormControl>
-                  <InputLabel>Category</InputLabel>
-                  <Select label="Category" value={values.category_id} onChange={(e) => handle("category_id", e.target.value)} disabled={loadingCats}>
-                    {categories.map((c) => (
-                      <MenuItem key={c._id} value={c._id}>{c.name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <TextField label="Name" value={values.name} onChange={(e) => handle("name", e.target.value)} />
-                <TextField type="number" label="Selling Price" value={values.price} onChange={(e) => handle("price", parseFloat(e.target.value || 0))} />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormControl>
-                  <InputLabel shrink>Active</InputLabel>
-                  <div className="mt-2"><Switch checked={values.is_active} onChange={(e) => handle("is_active", e.target.checked)} /></div>
-                </FormControl>
-                <FormControl>
-                  <InputLabel shrink>Allow Returns</InputLabel>
-                  <div className="mt-2"><Switch checked={values.allow_returns} onChange={(e) => handle("allow_returns", e.target.checked)} /></div>
-                </FormControl>
-              </div>
-                <TextField type="number" label="Cost Price (Hidden from Cashier UI)" value={values.cost} onChange={(e) => handle("cost", parseFloat(e.target.value || 0))} />
-              </div>
-            </CardContent>
-          </Card>
+      <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
+        <Grid container spacing={4}>
+
+          {/* Preview & Categories - LEFT SIDE (md=4) */}
+          <Grid item xs={12} md={4} sx={{ order: { xs: 2, md: 1 } }}>
+            <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
+                  Item Preview
+                </Typography>
+
+                {/* Price Preview */}
+                <Box sx={{ mb: 2.5 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
+                    <span>Selling Price</span>
+                    <Typography sx={{ fontWeight: 600, color: '#4caf50' }}>Rs {values.price.toFixed(2)}</Typography>
+                  </Box>
+                  {showProfit && (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
+                      <span>Profit / unit</span>
+                      <Typography sx={{ fontWeight: 600, color: '#4caf50' }}>Rs {profit.toFixed(2)}</Typography>
+                    </Box>
+                  )}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: 'text.secondary' }}>
+                    <span>Cost Price</span>
+                    <span>Rs {values.cost.toFixed(2)}</span>
+                  </Box>
+                </Box>
+
+                <Divider sx={{ my: 2.5 }} />
+
+                {/* Status */}
+                <Box sx={{ mb: 2.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
+                    Status
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography sx={{ fontSize: '0.875rem' }}>Active</Typography>
+                    <Switch checked={values.is_active} onChange={(e) => handle("is_active", e.target.checked)} />
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography sx={{ fontSize: '0.875rem' }}>Allow Returns</Typography>
+                    <Switch checked={values.allow_returns} onChange={(e) => handle("allow_returns", e.target.checked)} />
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* Categories Management */}
+            <Card className="rounded-2xl shadow-sm mt-3" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 2.5 }}>
+                  Categories
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1.5, mb: 1.5 }}>
+                  <TextField
+                    size="small"
+                    label="New category name"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    fullWidth
+                  />
+                  <Button
+                    variant="outlined"
+                    onClick={() => newCategoryName && createCategory.mutate({ name: newCategoryName })}
+                    disabled={!newCategoryName || createCategory.isPending}
+                    sx={{ borderColor: '#4caf5050', color: '#4caf50', '&:hover': { borderColor: '#4caf50' } }}
+                  >
+                    Add
+                  </Button>
+                </Box>
+                <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+                  Add a category then select it in the dropdown.
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Item Details Form - RIGHT SIDE (md=8) */}
+          <Grid item xs={12} md={8} sx={{ order: { xs: 1, md: 2 } }}>
+            <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 3 }}>
+                  Item Details
+                </Typography>
+
+                {/* Form Fields */}
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5 }}>
+                  <TextField
+                    label="SKU / Item Code"
+                    value={values.sku}
+                    onChange={(e) => handle("sku", e.target.value)}
+                    size="small"
+                  />
+                  <FormControl size="small">
+                    <InputLabel>Category</InputLabel>
+                    <Select
+                      label="Category"
+                      value={values.category_id}
+                      onChange={(e) => handle("category_id", e.target.value)}
+                      disabled={loadingCats}
+                    >
+                      {categories.map((c) => (
+                        <MenuItem key={c._id} value={c._id}>{c.name}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <TextField
+                    label="Product Name"
+                    value={values.name}
+                    onChange={(e) => handle("name", e.target.value)}
+                    size="small"
+                    sx={{ gridColumn: { xs: '1', md: 'span 2' } }}
+                  />
+                  <TextField
+                    type="number"
+                    label="Selling Price (Rs)"
+                    value={values.price}
+                    onChange={(e) => handle("price", parseFloat(e.target.value || 0))}
+                    size="small"
+                  />
+                  <TextField
+                    type="number"
+                    label="Cost Price (Rs)"
+                    value={values.cost}
+                    onChange={(e) => handle("cost", parseFloat(e.target.value || 0))}
+                    size="small"
+                    helperText="Hidden from cashier UI"
+                  />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
         </Grid>
-        <Grid item xs={12} md={4}>
-          <Card className="rounded-2xl shadow-sm">
-            <CardContent>
-              <Typography variant="subtitle1" className="font-semibold">Preview</Typography>
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="flex justify-between"><span>Price</span><span className="font-medium">Rs {values.price.toFixed(2)}</span></div>
-                {showProfit && <div className="flex justify-between"><span>Profit / unit</span><span className="font-medium text-emerald-600">Rs {profit.toFixed(2)}</span></div>}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="rounded-2xl shadow-sm mt-3">
-            <CardContent className="space-y-3">
-              <Typography variant="subtitle1" className="font-semibold">Categories</Typography>
-              <div className="flex gap-2">
-                <TextField size="small" label="New category name" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} />
-                <Button variant="outlined" onClick={() => newCategoryName && createCategory.mutate({ name: newCategoryName })} disabled={!newCategoryName || createCategory.isPending}>Add</Button>
-              </div>
-              <div className="text-xs text-slate-500">Add a category then select it in the dropdown.</div>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      </Box>
     </Section>
   );
 }

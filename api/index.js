@@ -87,6 +87,15 @@ app.get('/health', (req, res) => {
 module.exports = async (req, res) => {
     try {
         await connectToDatabase();
+
+        // Extract the actual path from the query parameter passed by Vercel rewrite
+        if (req.url && req.url.includes('?path=')) {
+            const urlParts = req.url.split('?path=');
+            if (urlParts[1]) {
+                req.url = '/' + urlParts[1];
+            }
+        }
+
         return app(req, res);
     } catch (error) {
         console.error('Handler error:', error);

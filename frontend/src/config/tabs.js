@@ -19,16 +19,18 @@ import {
   Payment as PaymentIcon,
   History as HistoryIcon,
   AccountBalanceWallet as WalletIcon,
+  Receipt as ReceiptHistoryIcon,
 } from "@mui/icons-material"
 
 export const tabs = [
   { key: "dashboard", label: "Dashboard", icon: <DashboardIcon />, path: "/dashboard" },
   { key: "inventory", label: "Inventory", icon: <InventoryIcon />, path: "/inventory" },
   { key: "addedit", label: "Add / Edit Items", icon: <AddBoxIcon />, path: "/addedit" },
-  { key: "quotations", label: "Quotations", icon: <QuoteIcon />, path: "/quotations" },
+  { key: "quotations", label: "Products", icon: <QuoteIcon />, path: "/quotations" },
   { key: "cashsales", label: "Cash Sales", icon: <POSIcon />, path: "/cashsales" },
   { key: "creditsales", label: "Credit Sales", icon: <ReceiptIcon />, path: "/creditsales" },
   { key: "creditpayments", label: "Credit Payments", icon: <PaymentIcon />, path: "/creditpayments" },
+  { key: "saleshistory", label: "Sales History", icon: <ReceiptHistoryIcon />, path: "/sales-history" },
   { key: "returns", label: "Returns & Refunds", icon: <ReturnIcon />, path: "/returns" },
   { key: "customers", label: "Customers", icon: <PeopleIcon />, path: "/customers" },
   { key: "indebted", label: "Indebted Clients", icon: <BalanceIcon />, path: "/indebted" },
@@ -58,6 +60,7 @@ export const tabPermissions = {
   suppliers: "view_suppliers",
   transactions: "admin_only", // Admin only
   payments: "admin_only", // Admin only
+  saleshistory: "view_reports", // Staff and managers can view sales history
   profile: null, // No permission required - all users can access their profile
   // Removed: todo, subscription, settings, mraCompliance
 }

@@ -22,6 +22,7 @@ import {
   Chip,
   Alert,
   Box,
+  Paper,
 } from "@mui/material"
 import { ReceiptLong, QrCode2, Delete, Close } from "@mui/icons-material"
 // Replaced mock inventoryRows with live products via backend
@@ -54,6 +55,7 @@ export default function CashSales() {
   const [paymentReference, setPaymentReference] = useState("")
   const [showInvoice, setShowInvoice] = useState(false)
   const [invoiceData, setInvoiceData] = useState(null)
+  const [isPreviewMode, setIsPreviewMode] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [showVariantDialog, setShowVariantDialog] = useState(false)
   const [selectedProductForVariant, setSelectedProductForVariant] = useState(null)
@@ -113,13 +115,13 @@ export default function CashSales() {
   const addToCart = (item, variant = null) => {
     setCart((prev) => {
       // Create unique identifier including variant info
-      const itemKey = variant 
-        ? `${item.sku}-${variant.name}-${variant.value}` 
+      const itemKey = variant
+        ? `${item.sku}-${variant.name}-${variant.value}`
         : item.sku
-      
+
       const existingItem = prev.find((p) => {
-        const cartKey = p.variant 
-          ? `${p.sku}-${p.variant.name}-${p.variant.value}` 
+        const cartKey = p.variant
+          ? `${p.sku}-${p.variant.name}-${p.variant.value}`
           : p.sku
         return cartKey === itemKey
       })
@@ -130,8 +132,8 @@ export default function CashSales() {
       const finalPrice = basePrice + variantPrice
 
       // Map backend product shape to expected cart item properties
-      const mapped = { 
-        ...item, 
+      const mapped = {
+        ...item,
         price: finalPrice,
         variant: variant ? {
           name: variant.name,
@@ -142,13 +144,13 @@ export default function CashSales() {
         displayName: variant ? `${item.name} (${variant.name}: ${variant.value})` : item.name
       }
 
-      return existingItem 
+      return existingItem
         ? prev.map((p) => {
-            const cartKey = p.variant 
-              ? `${p.sku}-${p.variant.name}-${p.variant.value}` 
-              : p.sku
-            return cartKey === itemKey ? { ...p, qty: p.qty + 1 } : p
-          })
+          const cartKey = p.variant
+            ? `${p.sku}-${p.variant.name}-${p.variant.value}`
+            : p.sku
+          return cartKey === itemKey ? { ...p, qty: p.qty + 1 } : p
+        })
         : [...prev, { ...mapped, qty: 1 }]
     })
   }
@@ -235,7 +237,7 @@ export default function CashSales() {
         },
       })
       // Invalidate inventory summary to refresh stock globally
-      queryClient.invalidateQueries({ queryKey: ["inventory","summary"] })
+      queryClient.invalidateQueries({ queryKey: ["inventory", "summary"] })
     } catch (e) {
       const errorMsg = e?.response?.data?.message || e?.message || "Checkout failed"
       console.error("Checkout error:", e)
@@ -247,9 +249,9 @@ export default function CashSales() {
     }
 
     // Generate invoice JSON
-  // Always label as Walk-in in invoice output
-  const customerData = { name: "Walk-in Customer", phone: null, idNumber: null }
-  const invoiceJSON = await generateInvoiceJSON(cart, customerData, paymentTypeMap[paymentMethod].toLowerCase())
+    // Always label as Walk-in in invoice output
+    const customerData = { name: "Walk-in Customer", phone: null, idNumber: null }
+    const invoiceJSON = await generateInvoiceJSON(cart, customerData, paymentTypeMap[paymentMethod].toLowerCase())
 
     invoiceJSON.discount = discountAmount
     invoiceJSON.discountType = discount.type
@@ -270,35 +272,75 @@ export default function CashSales() {
       date: new Date().toISOString(),
     }
 
-  const existingSales = JSON.parse(localStorage.getItem("cash-sales") || "[]")
-  existingSales.push({ ...saleRecord, salesOrder })
-  localStorage.setItem("cash-sales", JSON.stringify(existingSales))
+    const existingSales = JSON.parse(localStorage.getItem("cash-sales") || "[]")
+    existingSales.push({ ...saleRecord, salesOrder })
+    localStorage.setItem("cash-sales", JSON.stringify(existingSales))
 
     setInvoiceData(saleRecord)
+    setIsPreviewMode(false) // Set to false since sale is finalized
     setShowInvoice(true)
     setIsProcessing(false)
   }
 
-  const handleCompleteSale = () => {
-    setCart([])
-    setCustomerName("")
-    setDiscount({ type: "percentage", value: 0 })
-    setPaymentMethod("cash")
-    setPaymentReference("")
-    setShowInvoice(false)
-    setInvoiceData(null)
+  const handlePreviewInvoice = async () => {
+    if (cart.length === 0) {
+      alert("Please add items to cart")
+      return
+    }
+
+    // Generate preview invoice data without fiscalizing
+    const customerData = { name: customerName || "Walk-in Customer", phone: null, idNumber: null }
+    const invoiceJSON = await generateInvoiceJSON(cart, customerData, paymentMethod)
+
+    invoiceJSON.discount = discountAmount
+    invoiceJSON.discountType = discount.type
+    invoiceJSON.discountValue = discount.value
+    invoiceJSON.subtotal = subtotal
+    invoiceJSON.total = total
+    invoiceJSON.tax = tax
+    invoiceJSON.paymentMethod = paymentMethod
+    invoiceJSON.paymentReference = paymentReference
+    invoiceJSON.invoiceNumber = `PREVIEW-${Date.now()}`
+    invoiceJSON.timestamp = new Date().toISOString()
+
+    setInvoiceData(invoiceJSON)
+    setIsPreviewMode(true) // This is just a preview
+    setShowInvoice(true)
+  }
+
+  const handleCompleteSale = async () => {
+    // This function finalizes a previewed sale
+    if (isPreviewMode) {
+      // Close preview and trigger actual checkout
+      setShowInvoice(false)
+      await handleGenerateInvoice()
+    } else {
+      // Sale already finalized, just clear
+      setCart([])
+      setCustomerName("")
+      setDiscount({ type: "percentage", value: 0 })
+      setPaymentMethod("cash")
+      setPaymentReference("")
+      setShowInvoice(false)
+      setInvoiceData(null)
+      setIsPreviewMode(false)
+    }
+  }
+
+  const handlePrintInvoice = () => {
+    window.print()
   }
 
   return (
     <>
       <Section title="Cash Sales" breadcrumbs={["Home", "Sales", "Cash"]}>
         {/* TWO COLUMN FLEXBOX LAYOUT */}
-        <div style={{ 
-          display: 'flex', 
+        <div style={{
+          display: 'flex',
           gap: '16px',
           flexWrap: 'wrap'
         }}>
-          
+
           {/* Payment Summary - LEFT COLUMN */}
           <div style={{ width: '350px', flexShrink: 0 }}>
             <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005', height: '100%' }}>
@@ -308,131 +350,131 @@ export default function CashSales() {
                 </Typography>
 
                 <Box sx={{ flex: 1, overflowY: 'auto', pr: 1, mb: 2 }}>
-                {/* Location */}
-                <Box sx={{ mb: 2 }}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Location</InputLabel>
-                    <Select
-                      value={selectedLocationId}
-                      label="Location"
-                      onChange={(e) => setSelectedLocationId(e.target.value)}
-                    >
-                      {locations.map((l) => (
-                        <MenuItem key={l._id} value={l._id}>
-                          {l.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Box>
-
-                {/* Customer */}
-                <Box sx={{ mb: 2 }}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Customer</InputLabel>
-                    <Select
-                      value={selectedCustomerId}
-                      label="Customer"
-                      onChange={(e) => setSelectedCustomerId(e.target.value)}
-                    >
-                      {customers.map((c) => (
-                        <MenuItem key={c._id} value={c._id}>
-                          {c.name || c.first_name + " " + c.last_name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Box>
-
-                {/* Customer Name Optional - only show when no customer selected (walk-in) */}
-                {!selectedCustomerId && (
+                  {/* Location */}
                   <Box sx={{ mb: 2 }}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      label="Customer Name (Optional)"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="Walk-in Customer"
-                    />
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Location</InputLabel>
+                      <Select
+                        value={selectedLocationId}
+                        label="Location"
+                        onChange={(e) => setSelectedLocationId(e.target.value)}
+                      >
+                        {locations.map((l) => (
+                          <MenuItem key={l._id} value={l._id}>
+                            {l.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                   </Box>
-                )}
 
-                {/* Payment Method */}
-                <Box sx={{ mb: 2 }}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Payment Method</InputLabel>
-                    <Select value={paymentMethod} label="Payment Method" onChange={(e) => setPaymentMethod(e.target.value)}>
-                      {PAYMENT_METHODS.map((method) => (
-                        <MenuItem key={method.value} value={method.value}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <span>{method.icon}</span>
-                            <span>{method.label}</span>
-                          </Box>
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Box>
-
-                {/* Payment Reference - not required for Cash/Split/Credit in this UI */}
-
-                {/* Split Payment */}
-                {paymentMethod === "split" && (
+                  {/* Customer */}
                   <Box sx={{ mb: 2 }}>
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-                      <Chip size="small" label="0%" onClick={() => { setSplitCash(0); setSplitCredit(total); }} />
-                      <Chip size="small" label="50%" onClick={() => { const v = Number((total * 0.5).toFixed(2)); setSplitCash(v); setSplitCredit(Number((total - v).toFixed(2))); }} />
-                      <Chip size="small" label="100%" onClick={() => { setSplitCash(total); setSplitCredit(0); }} />
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Customer</InputLabel>
+                      <Select
+                        value={selectedCustomerId}
+                        label="Customer"
+                        onChange={(e) => setSelectedCustomerId(e.target.value)}
+                      >
+                        {customers.map((c) => (
+                          <MenuItem key={c._id} value={c._id}>
+                            {c.name || c.first_name + " " + c.last_name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Box>
+
+                  {/* Customer Name Optional - only show when no customer selected (walk-in) */}
+                  {!selectedCustomerId && (
+                    <Box sx={{ mb: 2 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Customer Name (Optional)"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        placeholder="Walk-in Customer"
+                      />
                     </Box>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="Amount Paid Now (Cash)"
-                      value={splitCash}
-                      onChange={(e) => {
-                        const v = Math.max(0, Math.min(total, Number(e.target.value) || 0));
-                        setSplitCash(v);
-                        setSplitCredit(Number((total - v).toFixed(2)));
-                      }}
-                      size="small"
-                      helperText={`Credit to book: $${Number(splitCredit).toFixed(2)} (Total: $${total.toFixed(2)})`}
-                    />
-                  </Box>
-                )}
+                  )}
 
-                {/* Credit Alert */}
-                {paymentMethod === "credit" && (
+                  {/* Payment Method */}
                   <Box sx={{ mb: 2 }}>
-                    <Alert severity="info">Entire amount will be booked to customer credit balance.</Alert>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Payment Method</InputLabel>
+                      <Select value={paymentMethod} label="Payment Method" onChange={(e) => setPaymentMethod(e.target.value)}>
+                        {PAYMENT_METHODS.map((method) => (
+                          <MenuItem key={method.value} value={method.value}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <span>{method.icon}</span>
+                              <span>{method.label}</span>
+                            </Box>
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                   </Box>
-                )}
 
-                {/* Discount */}
-                <Box sx={{ mb: 2 }}>
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    <TextField
-                      select
-                      label="Discount Type"
-                      value={discount.type}
-                      onChange={(e) => setDiscount((prev) => ({ ...prev, type: e.target.value }))}
-                      sx={{ width: 120 }}
-                      size="small"
-                    >
-                      <MenuItem value="percentage">%</MenuItem>
-                      <MenuItem value="fixed">$</MenuItem>
-                    </TextField>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="Discount"
-                      value={discount.value}
-                      onChange={(e) => setDiscount((prev) => ({ ...prev, value: Number.parseFloat(e.target.value) || 0 }))}
-                      inputProps={{ min: 0, step: 0.01 }}
-                      size="small"
-                    />
+                  {/* Payment Reference - not required for Cash/Split/Credit in this UI */}
+
+                  {/* Split Payment */}
+                  {paymentMethod === "split" && (
+                    <Box sx={{ mb: 2 }}>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                        <Chip size="small" label="0%" onClick={() => { setSplitCash(0); setSplitCredit(total); }} />
+                        <Chip size="small" label="50%" onClick={() => { const v = Number((total * 0.5).toFixed(2)); setSplitCash(v); setSplitCredit(Number((total - v).toFixed(2))); }} />
+                        <Chip size="small" label="100%" onClick={() => { setSplitCash(total); setSplitCredit(0); }} />
+                      </Box>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Amount Paid Now (Cash)"
+                        value={splitCash}
+                        onChange={(e) => {
+                          const v = Math.max(0, Math.min(total, Number(e.target.value) || 0));
+                          setSplitCash(v);
+                          setSplitCredit(Number((total - v).toFixed(2)));
+                        }}
+                        size="small"
+                        helperText={`Credit to book: $${Number(splitCredit).toFixed(2)} (Total: $${total.toFixed(2)})`}
+                      />
+                    </Box>
+                  )}
+
+                  {/* Credit Alert */}
+                  {paymentMethod === "credit" && (
+                    <Box sx={{ mb: 2 }}>
+                      <Alert severity="info">Entire amount will be booked to customer credit balance.</Alert>
+                    </Box>
+                  )}
+
+                  {/* Discount */}
+                  <Box sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <TextField
+                        select
+                        label="Discount Type"
+                        value={discount.type}
+                        onChange={(e) => setDiscount((prev) => ({ ...prev, type: e.target.value }))}
+                        sx={{ width: 120 }}
+                        size="small"
+                      >
+                        <MenuItem value="percentage">%</MenuItem>
+                        <MenuItem value="fixed">$</MenuItem>
+                      </TextField>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Discount"
+                        value={discount.value}
+                        onChange={(e) => setDiscount((prev) => ({ ...prev, value: Number.parseFloat(e.target.value) || 0 }))}
+                        inputProps={{ min: 0, step: 0.01 }}
+                        size="small"
+                      />
+                    </Box>
                   </Box>
-                </Box>
                 </Box>
 
                 <Divider sx={{ my: 1.5 }} />
@@ -463,23 +505,13 @@ export default function CashSales() {
                     onClick={handleGenerateInvoice}
                     disabled={cart.length === 0 || isProcessing || (paymentMethod === "split" && (Number((splitCash + splitCredit).toFixed(2)) !== Number(total.toFixed(2))))}
                     fullWidth
-                    sx={{ 
+                    sx={{
                       mb: 1.5,
                       bgcolor: '#4caf50',
                       '&:hover': { bgcolor: '#45a049' }
                     }}
                   >
-                    {isProcessing ? "Processing..." : "Checkout & Fiscalize"}
-                  </Button>
-                  <Button 
-                    variant="outlined" 
-                    startIcon={<QrCode2 />} 
-                    disabled 
-                    size="small"
-                    fullWidth
-                    sx={{ borderColor: '#4caf5050', color: '#4caf50' }}
-                  >
-                    Preview Invoice
+                    {isProcessing ? "Processing..." : "Finalize Sale"}
                   </Button>
                 </Box>
               </CardContent>
@@ -487,8 +519,8 @@ export default function CashSales() {
           </div>
 
           {/* Items Selection - RIGHT COLUMN */}
-          <div style={{ flex: 1, minWidth: '500px' }}>
-          {/* <Grid sx={{ order: { xs: 1, md: 2 } }}> */}
+          <div style={{ flex: 1, minWidth: '400px' }}>
+            {/* <Grid sx={{ order: { xs: 1, md: 2 } }}> */}
             <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
               <CardContent sx={{ p: 2.5 }}>
                 <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 2 }}>
@@ -497,9 +529,9 @@ export default function CashSales() {
 
                 {/* Search Bar */}
                 <Box sx={{ mb: 2 }}>
-                  <SearchInput 
-                    placeholder="Search products by name or SKU..." 
-                    value={query} 
+                  <SearchInput
+                    placeholder="Search products by name or SKU..."
+                    value={query}
                     onChange={setQuery}
                   />
                 </Box>
@@ -508,7 +540,7 @@ export default function CashSales() {
                 <Box sx={{ mb: 3 }}>
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gridTemplateColumns: 'repeat(4, 1fr)',
                     gap: 10,
                     maxHeight: '320px',
                     overflowY: 'auto',
@@ -534,7 +566,7 @@ export default function CashSales() {
                             flexDirection: 'column',
                             justifyContent: 'space-between',
                             alignItems: 'flex-start',
-                            height: 95,
+                            height: 80,
                             p: 1.5,
                             borderColor: '#4caf5050',
                             textAlign: 'left',
@@ -548,15 +580,15 @@ export default function CashSales() {
                           <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
                             <span style={{ fontWeight: 700, fontSize: 13 }}>Rs {Number(p.selling_price ?? p.price ?? 0).toFixed(2)}</span>
                             {p.variants && p.variants.length > 0 && (
-                              <Chip 
-                                label={`${p.variants.length}v`} 
-                                size="small" 
-                                sx={{ 
-                                  height: 16, 
+                              <Chip
+                                label={`${p.variants.length}v`}
+                                size="small"
+                                sx={{
+                                  height: 16,
                                   fontSize: '0.6rem',
                                   bgcolor: '#4caf5020',
                                   color: '#4caf50'
-                                }} 
+                                }}
                               />
                             )}
                           </div>
@@ -579,8 +611,8 @@ export default function CashSales() {
                     </Typography>
                   )}
                   {cart.map((c, index) => {
-                    const itemKey = c.variant 
-                      ? `${c.sku}-${c.variant.name}-${c.variant.value}-${index}` 
+                    const itemKey = c.variant
+                      ? `${c.sku}-${c.variant.name}-${c.variant.value}-${index}`
                       : `${c.sku}-${index}`
                     return (
                       <Box key={itemKey} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 1.5, borderRadius: 2, bgcolor: '#f8f9fa', mb: 1.5 }}>
@@ -602,15 +634,15 @@ export default function CashSales() {
                             size="small"
                             onClick={() => {
                               setCart((prev) => {
-                                const cartKey = c.variant 
-                                  ? `${c.sku}-${c.variant.name}-${c.variant.value}` 
+                                const cartKey = c.variant
+                                  ? `${c.sku}-${c.variant.name}-${c.variant.value}`
                                   : c.sku
                                 return prev.map((p, i) => {
-                                  const pKey = p.variant 
-                                    ? `${p.sku}-${p.variant.name}-${p.variant.value}` 
+                                  const pKey = p.variant
+                                    ? `${p.sku}-${p.variant.name}-${p.variant.value}`
                                     : p.sku
-                                  return pKey === cartKey && i === index 
-                                    ? { ...p, qty: Math.max(1, p.qty - 1) } 
+                                  return pKey === cartKey && i === index
+                                    ? { ...p, qty: Math.max(1, p.qty - 1) }
                                     : p
                                 })
                               })
@@ -623,15 +655,15 @@ export default function CashSales() {
                             size="small"
                             onClick={() => {
                               setCart((prev) => {
-                                const cartKey = c.variant 
-                                  ? `${c.sku}-${c.variant.name}-${c.variant.value}` 
+                                const cartKey = c.variant
+                                  ? `${c.sku}-${c.variant.name}-${c.variant.value}`
                                   : c.sku
                                 return prev.map((p, i) => {
-                                  const pKey = p.variant 
-                                    ? `${p.sku}-${p.variant.name}-${p.variant.value}` 
+                                  const pKey = p.variant
+                                    ? `${p.sku}-${p.variant.name}-${p.variant.value}`
                                     : p.sku
-                                  return pKey === cartKey && i === index 
-                                    ? { ...p, qty: p.qty + 1 } 
+                                  return pKey === cartKey && i === index
+                                    ? { ...p, qty: p.qty + 1 }
                                     : p
                                 })
                               })
@@ -654,168 +686,144 @@ export default function CashSales() {
               </CardContent>
             </Card>
           </div>
-          
+
 
         </div>
       </Section>
 
       {/* Invoice Dialog */}
       <Dialog open={showInvoice} onClose={() => setShowInvoice(false)} maxWidth="md" fullWidth>
-        <DialogTitle className="flex items-center justify-between">
-          <span>MRA Fiscalized Invoice</span>
-          <IconButton onClick={() => setShowInvoice(false)}>
-            <Close />
-          </IconButton>
+        <DialogTitle sx={{ borderBottom: '1px solid #000', pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                {isPreviewMode ? "INVOICE PREVIEW" : "INVOICE"}
+              </Typography>
+              <Typography variant="body2">
+                Your Inventory Management System
+              </Typography>
+            </Box>
+            <IconButton onClick={() => setShowInvoice(false)} size="small">
+              <Close />
+            </IconButton>
+          </Box>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ p: 3 }}>
           {invoiceData && (
-            <div className="space-y-4">
-              {invoiceData.success ? (
-                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <Typography variant="body2" className="text-green-800 font-medium">
-                    ✓ Invoice successfully fiscalized with MRA
-                  </Typography>
-                </div>
-              ) : (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <Typography variant="body2" className="text-red-800 font-medium">
-                    ✗ Fiscalization failed: {invoiceData.error}
-                  </Typography>
-                </div>
+            <Box sx={{ '@media print': { padding: 0 } }}>
+              {/* Show success only if fiscalized */}
+              {!isPreviewMode && invoiceData.success && (
+                <Box sx={{ mb: 2 }}>
+                  <Alert severity="success">
+                    ✓ Invoice fiscalized successfully
+                  </Alert>
+                </Box>
               )}
 
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    Invoice Number
-                  </Typography>
-                  <Typography variant="body1" className="font-mono font-semibold">
-                    {invoiceData.invoiceNumber}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    Date & Time
-                  </Typography>
-                  <Typography variant="body2">{new Date(invoiceData.timestamp).toLocaleString()}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary">
-                    Payment Method
-                  </Typography>
-                  <div className="mt-1">
-                    <Chip
-                      label={PAYMENT_METHODS.find((m) => m.value === invoiceData.paymentMethod)?.label || "Cash"}
-                      size="small"
-                      color="primary"
-                    />
-                  </div>
-                </Grid>
+              {/* Show success alert after sale is finalized */}
+              {!isPreviewMode && invoiceData && (
+                <Alert severity="success" sx={{ mb: 2 }}>
+                  Sale completed successfully!
+                </Alert>
+              )}
+
+              <Box sx={{ mb: 3, border: '1px solid #ddd', p: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Invoice #:</Typography>
+                    <Typography variant="body2">{invoiceData.invoiceNumber}</Typography>
+                  </Box>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Date:</Typography>
+                    <Typography variant="body2">{new Date(invoiceData.timestamp).toLocaleString()}</Typography>
+                  </Box>
+                </Box>
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Payment Method:</Typography>
+                  <Typography variant="body2">{PAYMENT_METHODS.find((m) => m.value === invoiceData.paymentMethod)?.label || "Cash"}</Typography>
+                </Box>
                 {invoiceData.paymentReference && (
-                  <Grid item xs={6}>
-                    <Typography variant="caption" color="text.secondary">
-                      Payment Reference
-                    </Typography>
-                    <Typography variant="body2" className="font-mono">
-                      {invoiceData.paymentReference}
-                    </Typography>
-                  </Grid>
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Reference:</Typography>
+                    <Typography variant="body2">{invoiceData.paymentReference}</Typography>
+                  </Box>
                 )}
                 {invoiceData.irn && (
-                  <>
-                    <Grid item xs={12}>
-                      <Typography variant="caption" color="text.secondary">
-                        IRN (Invoice Reference Number)
-                      </Typography>
-                      <Typography variant="body1" className="font-mono text-sm">
-                        {invoiceData.irn}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12}>
-                      <Typography variant="caption" color="text.secondary">
-                        QR Code Verification
-                      </Typography>
-                      <div className="mt-2 p-4 bg-slate-100 rounded-lg text-center">
-                        <QrCode2 className="text-6xl text-slate-600" />
-                        <Typography variant="caption" className="block mt-2">
-                          {invoiceData.qrCode}
-                        </Typography>
-                      </div>
-                    </Grid>
-                  </>
+                  <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #ddd' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>IRN:</Typography>
+                    <Typography variant="body2">{invoiceData.irn}</Typography>
+                  </Box>
                 )}
-              </Grid>
+              </Box>
 
-              <Divider />
 
-              <div>
-                <Typography variant="subtitle2" className="font-semibold mb-2">
+
+              {/* Items */}
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1.5 }}>
                   Items
                 </Typography>
-                {invoiceData.items?.map((item, i) => (
-                  <div key={i} className="flex justify-between text-sm py-1">
-                    <span>
-                      {item.name} × {item.quantity}
-                      {item.variant && (
-                        <span className="text-xs text-slate-500 ml-1">
-                          ({item.variant})
-                        </span>
-                      )}
-                    </span>
-                    <span className="font-medium">Rs {item.total.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
+                <Box sx={{ border: '1px solid #000' }}>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '2fr 0.5fr 1fr 1fr', gap: 1, p: 1, bgcolor: '#f5f5f5', borderBottom: '1px solid #000', fontWeight: 'bold', fontSize: '0.875rem' }}>
+                    <Box>Item</Box>
+                    <Box sx={{ textAlign: 'center' }}>Qty</Box>
+                    <Box sx={{ textAlign: 'right' }}>Price</Box>
+                    <Box sx={{ textAlign: 'right' }}>Total</Box>
+                  </Box>
+                  {invoiceData.items?.map((item, i) => (
+                    <Box key={i} sx={{ display: 'grid', gridTemplateColumns: '2fr 0.5fr 1fr 1fr', gap: 1, p: 1, borderBottom: i < invoiceData.items.length - 1 ? '1px solid #ddd' : 'none' }}>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.875rem', fontWeight: 500 }}>{item.name}</Typography>
+                        {item.variant && (
+                          <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>({item.variant})</Typography>
+                        )}
+                      </Box>
+                      <Box sx={{ textAlign: 'center', fontSize: '0.875rem' }}>{item.quantity}</Box>
+                      <Box sx={{ textAlign: 'right', fontSize: '0.875rem' }}>Rs {item.price?.toFixed(2) || (item.total / item.quantity).toFixed(2)}</Box>
+                      <Box sx={{ textAlign: 'right', fontSize: '0.875rem', fontWeight: 600 }}>Rs {item.total.toFixed(2)}</Box>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
 
-              <Divider />
-
-              <div className="space-y-1">
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span>${invoiceData.subtotal.toFixed(2)}</span>
-                </div>
+              {/* Totals */}
+              <Box sx={{ border: '1px solid #000', p: 2, mt: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
+                  <Typography>Subtotal</Typography>
+                  <Typography sx={{ fontWeight: 500 }}>Rs {invoiceData.subtotal.toFixed(2)}</Typography>
+                </Box>
                 {invoiceData.discount > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount</span>
-                    <span>-${invoiceData.discount.toFixed(2)}</span>
-                  </div>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
+                    <Typography>Discount</Typography>
+                    <Typography sx={{ fontWeight: 500 }}>-Rs {invoiceData.discount.toFixed(2)}</Typography>
+                  </Box>
                 )}
-                <div className="flex justify-between">
-                  <span>Tax (15%)</span>
-                  <span>${invoiceData.tax.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-lg font-semibold">
-                  <span>Total</span>
-                  <span>${invoiceData.total.toFixed(2)}</span>
-                </div>
-              </div>
+                {invoiceData.tax > 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
+                    <Typography>Tax</Typography>
+                    <Typography sx={{ fontWeight: 500 }}>Rs {invoiceData.tax.toFixed(2)}</Typography>
+                  </Box>
+                )}
+                <Divider sx={{ my: 1.5 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography sx={{ fontSize: '1rem', fontWeight: 'bold' }}>TOTAL</Typography>
+                  <Typography sx={{ fontSize: '1rem', fontWeight: 'bold' }}>Rs {invoiceData.total.toFixed(2)}</Typography>
+                </Box>
+              </Box>
 
-              <Divider />
-
-              <div>
-                <Typography variant="subtitle2" className="font-semibold mb-2">
-                  Send to Customer
-                </Typography>
-                <div className="flex gap-2">
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Customer Phone (WhatsApp)"
-                    placeholder="+230 5 123 4567"
-                    value={""}
-                    onChange={() => {}}
-                  />
-                  <Button variant="outlined" startIcon={<Close />} disabled size="small">
-                    Send
-                  </Button>
-                </div>
-              </div>
-            </div>
+              {/* Thank you message */}
+              <Box sx={{ mt: 3, textAlign: 'center', color: 'text.secondary' }}>
+                <Typography variant="body2">Thank you for your business!</Typography>
+              </Box>
+            </Box>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button variant="contained" onClick={handleCompleteSale}>
-            Complete Sale
+        <DialogActions sx={{ p: 2, borderTop: '1px solid #000' }}>
+          <Button onClick={() => setShowInvoice(false)}>
+            Close
+          </Button>
+          <Button variant="outlined" onClick={handlePrintInvoice}>
+            Print Invoice
           </Button>
         </DialogActions>
       </Dialog>

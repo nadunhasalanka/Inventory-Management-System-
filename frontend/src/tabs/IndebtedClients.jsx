@@ -91,9 +91,9 @@ export default function IndebtedClients() {
   // Filter customers based on search (memoized for performance)
   const filteredCustomers = useMemo(() => {
     if (!searchQuery) return currentCustomers
-    
+
     const query = searchQuery.toLowerCase()
-    return currentCustomers.filter(item => 
+    return currentCustomers.filter(item =>
       item.customer.name?.toLowerCase().includes(query) ||
       item.customer.email?.toLowerCase().includes(query) ||
       item.customer.phone?.toLowerCase().includes(query)
@@ -167,7 +167,7 @@ export default function IndebtedClients() {
       `Outstanding: Rs ${customerData.totalOutstanding.toFixed(2)}\n` +
       `Overdue Orders: ${customerData.ordersCount}`
     )
-    
+
     if (confirmed) {
       emailReminderMutation.mutate(customerData.customer._id)
     }
@@ -179,7 +179,7 @@ export default function IndebtedClients() {
       `This will send individual emails to each customer with their overdue order details.\n\n` +
       `Continue?`
     )
-    
+
     if (confirmed) {
       emailAllMutation.mutate(0)
     }
@@ -243,8 +243,8 @@ export default function IndebtedClients() {
   const isProcessing = orderPaymentMutation.isLoading || fullPaymentMutation.isLoading
 
   return (
-    <Section 
-      title="Indebted Clients" 
+    <Section
+      title="Indebted Clients"
       breadcrumbs={["Home", "Clients", "Indebted"]}
       right={
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -257,9 +257,9 @@ export default function IndebtedClients() {
           >
             {emailAllMutation.isLoading ? "Sending..." : "Email All"}
           </Button>
-          <Chip 
+          <Chip
             icon={activeTab === 0 ? <CreditCardIcon /> : <ScheduleIcon />}
-            label={`${filteredCustomers.length} ${activeTab === 0 ? 'Credit' : 'Overdue'}`} 
+            label={`${filteredCustomers.length} ${activeTab === 0 ? 'Credit' : 'Overdue'}`}
             color={activeTab === 0 ? "primary" : "error"}
             variant="outlined"
           />
@@ -267,66 +267,64 @@ export default function IndebtedClients() {
       }
     >
       {/* Tabs */}
-      <Card className="rounded-2xl shadow-sm mb-4" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
-        <Tabs 
-          value={activeTab} 
-          onChange={handleTabChange}
-          variant="fullWidth"
-          sx={{ 
-            borderBottom: 1, 
-            borderColor: 'divider',
-            '& .MuiTab-root': {
-              fontSize: '0.9rem',
-              fontWeight: 500
-            },
-            '& .Mui-selected': {
-              color: '#4caf50',
-              fontWeight: 600
-            },
-            '& .MuiTabs-indicator': {
-              backgroundColor: '#4caf50'
-            }
-          }}
-        >
-          <Tab 
-            icon={<CreditCardIcon />} 
-            iconPosition="start"
-            label={`Credit Sales (${creditSalesCustomers.length})`}
-          />
-          <Tab 
-            icon={<ScheduleIcon />} 
-            iconPosition="start"
-            label={`Overdue (${overdueOnlyCustomers.length})`}
-          />
-        </Tabs>
-      </Card>
+      <Tabs
+        value={activeTab}
+        onChange={handleTabChange}
+        variant="fullWidth"
+        sx={{
+          mb: 3,
+          borderBottom: 1,
+          borderColor: 'divider',
+          '& .MuiTab-root': {
+            fontSize: '0.9rem',
+            fontWeight: 500
+          },
+          '& .Mui-selected': {
+            color: '#4caf50',
+            fontWeight: 600
+          },
+          '& .MuiTabs-indicator': {
+            backgroundColor: '#4caf50'
+          }
+        }}
+      >
+        <Tab
+          icon={<CreditCardIcon />}
+          iconPosition="start"
+          label={`Credit Sales (${creditSalesCustomers.length})`}
+        />
+        <Tab
+          icon={<ScheduleIcon />}
+          iconPosition="start"
+          label={`Overdue (${overdueOnlyCustomers.length})`}
+        />
+      </Tabs>
+
 
       {/* Search Bar */}
-      <Card className="rounded-2xl shadow-sm mb-4" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
-        <CardContent sx={{ p: 2.5 }}>
-          <TextField
-            fullWidth
-            placeholder="Search by customer name, email, or phone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            size="small"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon sx={{ color: '#4caf50' }} />
-                </InputAdornment>
-              ),
-            }}
-          />
-        </CardContent>
-      </Card>
+      <TextField
+        fullWidth
+        placeholder="Search by customer name, email, or phone..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        size="small"
+        sx={{ mb: 3 }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon sx={{ color: '#4caf50' }} />
+            </InputAdornment>
+          ),
+        }}
+      />
+
 
       {isLoading ? (
         <Alert severity="info">Loading customers...</Alert>
       ) : filteredCustomers.length === 0 ? (
         <Alert severity={searchQuery ? "info" : "success"} icon={<CheckCircleIcon />}>
-          {searchQuery 
-            ? "No customers match your search" 
+          {searchQuery
+            ? "No customers match your search"
             : activeTab === 0
               ? "No customers with credit sales!"
               : "No overdue customers! All payments are up to date."
@@ -337,211 +335,211 @@ export default function IndebtedClients() {
           {filteredCustomers.map((customerData) => (
             <Card key={customerData.customer._id} className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005', mb: 2 }}>
               <CardContent sx={{ p: 3 }}>
-                  {/* Customer Summary Row */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                    <Box sx={{ flex: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#333' }}>
-                          {customerData.customer.name}
-                        </Typography>
-                        <Chip
-                          icon={<ErrorIcon />}
-                          label={`${customerData.daysOverdue} days overdue`}
-                          color={getStatusColor(customerData.daysOverdue)}
-                          size="small"
-                          sx={{ fontWeight: 500 }}
-                        />
-                      </Box>
-                      
-                      <Grid container spacing={3} sx={{ mt: 0.5 }}>
-                        <Grid item xs={12} sm={6} md={3}>
-                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Email</Typography>
-                          <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{customerData.customer.email || 'N/A'}</Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
-                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Phone</Typography>
-                          <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{customerData.customer.phone || 'N/A'}</Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
-                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Total Outstanding</Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#d32f2f', fontSize: '0.95rem' }}>
-                            Rs {customerData.totalOutstanding.toFixed(2)}
-                          </Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
-                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Overdue Orders</Typography>
-                          <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 600 }}>{customerData.ordersCount}</Typography>
-                        </Grid>
-                      </Grid>
+                {/* Customer Summary Row */}
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 600, color: '#333' }}>
+                        {customerData.customer.name}
+                      </Typography>
+                      <Chip
+                        icon={<ErrorIcon />}
+                        label={`${customerData.daysOverdue} days overdue`}
+                        color={getStatusColor(customerData.daysOverdue)}
+                        size="small"
+                        sx={{ fontWeight: 500 }}
+                      />
                     </Box>
 
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                      <IconButton
-                        onClick={() => handleSendEmailReminder(customerData)}
-                        title="Send Email Reminder"
-                        disabled={emailReminderMutation.isLoading}
-                        sx={{ 
-                          color: '#4caf50',
-                          '&:hover': { bgcolor: '#4caf5010' }
-                        }}
-                      >
-                        <EmailIcon />
-                      </IconButton>
-                      <Button
-                        variant="contained"
-                        startIcon={<PaymentIcon />}
-                        onClick={() => handleOpenFullPaymentDialog(customerData)}
-                        disabled={isProcessing}
-                        size="small"
-                        sx={{
-                          bgcolor: '#4caf50',
-                          '&:hover': { bgcolor: '#45a049' }
-                        }}
-                      >
-                        Pay All
-                      </Button>
-                      <IconButton
-                        onClick={() => handleExpandCustomer(customerData.customer._id)}
-                        sx={{
-                          transform: expandedCustomer === customerData.customer._id ? 'rotate(180deg)' : 'rotate(0deg)',
-                          transition: 'transform 0.3s',
-                          color: '#4caf50'
-                        }}
-                      >
-                        <ExpandMoreIcon />
-                      </IconButton>
-                    </Box>
+                    <Grid container spacing={3} sx={{ mt: 0.5 }}>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Email</Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{customerData.customer.email || 'N/A'}</Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Phone</Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>{customerData.customer.phone || 'N/A'}</Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Total Outstanding</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#d32f2f', fontSize: '0.95rem' }}>
+                          Rs {customerData.totalOutstanding.toFixed(2)}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={3}>
+                        <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Overdue Orders</Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.875rem', fontWeight: 600 }}>{customerData.ordersCount}</Typography>
+                      </Grid>
+                    </Grid>
                   </Box>
 
-                  {/* Expanded Details */}
-                  <Collapse in={expandedCustomer === customerData.customer._id}>
-                    <Divider sx={{ my: 2.5 }} />
-                    <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 600, fontSize: '1rem', mb: 2 }}>
-                      Overdue Orders
-                    </Typography>
-                    
-                    <TableContainer component={Paper} variant="outlined" sx={{ border: '1px solid #e0e0e0' }}>
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell><strong>Order #</strong></TableCell>
-                            <TableCell><strong>Order Date</strong></TableCell>
-                            <TableCell><strong>Due Date</strong></TableCell>
-                            <TableCell><strong>Final Deadline</strong></TableCell>
-                            <TableCell align="right"><strong>Total</strong></TableCell>
-                            <TableCell align="right"><strong>Paid</strong></TableCell>
-                            <TableCell align="right"><strong>Outstanding</strong></TableCell>
-                            <TableCell><strong>Status</strong></TableCell>
-                            <TableCell align="center"><strong>Action</strong></TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {customerData.overdueOrders.map((order) => {
-                            const orderDaysOverdue = Math.floor(
-                              (new Date() - new Date(order.allowed_until || order.due_date)) / (1000 * 60 * 60 * 24)
-                            )
-                            return (
-                              <TableRow key={order._id}>
-                                <TableCell>{order.order_number}</TableCell>
-                                <TableCell>
-                                  {new Date(order.order_date || order.createdAt).toLocaleDateString()}
-                                </TableCell>
-                                <TableCell>
-                                  {order.due_date ? new Date(order.due_date).toLocaleDateString() : 'N/A'}
-                                </TableCell>
-                                <TableCell>
-                                  {order.allowed_until ? (
-                                    <Box>
-                                      <Typography variant="body2">
-                                        {new Date(order.allowed_until).toLocaleDateString()}
-                                      </Typography>
-                                      <Typography variant="caption" color="error">
-                                        {orderDaysOverdue} days ago
-                                      </Typography>
-                                    </Box>
-                                  ) : 'N/A'}
-                                </TableCell>
-                                <TableCell align="right">
-                                  Rs {(order.subtotal_snapshot || 0).toFixed(2)}
-                                </TableCell>
-                                <TableCell align="right">
-                                  Rs {(order.amount_paid_cash || 0).toFixed(2)}
-                                </TableCell>
-                                <TableCell align="right">
-                                  <strong className="text-red-600">
-                                    Rs {(order.credit_outstanding || 0).toFixed(2)}
-                                  </strong>
-                                </TableCell>
-                                <TableCell>
-                                  <Chip
-                                    label={order.payment_status}
-                                    color={order.payment_status === 'Partially Paid' ? 'warning' : 'error'}
-                                    size="small"
-                                  />
-                                </TableCell>
-                                <TableCell align="center">
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    onClick={() => handleOpenOrderPaymentDialog(customerData, order)}
-                                    disabled={isProcessing}
-                                    sx={{
-                                      borderColor: '#4caf5050',
-                                      color: '#4caf50',
-                                      '&:hover': {
-                                        borderColor: '#4caf50',
-                                        bgcolor: '#4caf5010'
-                                      }
-                                    }}
-                                  >
-                                    Pay
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            )
-                          })}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                    <IconButton
+                      onClick={() => handleSendEmailReminder(customerData)}
+                      title="Send Email Reminder"
+                      disabled={emailReminderMutation.isLoading}
+                      sx={{
+                        color: '#4caf50',
+                        '&:hover': { bgcolor: '#4caf5010' }
+                      }}
+                    >
+                      <EmailIcon />
+                    </IconButton>
+                    <Button
+                      variant="contained"
+                      startIcon={<PaymentIcon />}
+                      onClick={() => handleOpenFullPaymentDialog(customerData)}
+                      disabled={isProcessing}
+                      size="small"
+                      sx={{
+                        bgcolor: '#4caf50',
+                        '&:hover': { bgcolor: '#45a049' }
+                      }}
+                    >
+                      Pay All
+                    </Button>
+                    <IconButton
+                      onClick={() => handleExpandCustomer(customerData.customer._id)}
+                      sx={{
+                        transform: expandedCustomer === customerData.customer._id ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.3s',
+                        color: '#4caf50'
+                      }}
+                    >
+                      <ExpandMoreIcon />
+                    </IconButton>
+                  </Box>
+                </Box>
 
-                    {/* Customer Credit Info */}
-                    <Box sx={{ mt: 2.5, p: 2.5, bgcolor: '#f8f9fa', borderRadius: 2, border: '1px solid #e0e0e0' }}>
-                      <Grid container spacing={3}>
-                        <Grid item xs={6} sm={3}>
-                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Current Balance</Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                            Rs {(customerData.customer.current_balance || 0).toFixed(2)}
-                          </Typography>
-                        </Grid>
-                        <Grid item xs={6} sm={3}>
-                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Credit Limit</Typography>
-                          <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
-                            Rs {(customerData.customer.credit_limit || 0).toFixed(2)}
-                          </Typography>
-                        </Grid>
-                        <Grid item xs={6} sm={3}>
-                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Available Credit</Typography>
-                          <Typography variant="body2" sx={{
-                            fontWeight: 600,
-                            fontSize: '0.9rem',
-                            color: (customerData.customer.credit_limit - customerData.customer.current_balance) > 0 
-                              ? '#4caf50' 
-                              : '#d32f2f'
-                          }}>
-                            Rs {Math.max(0, (customerData.customer.credit_limit || 0) - (customerData.customer.current_balance || 0)).toFixed(2)}
-                          </Typography>
-                        </Grid>
-                        <Grid item xs={6} sm={3}>
-                          <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Oldest Overdue</Typography>
-                          <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
-                            {new Date(customerData.oldestOverdueDate).toLocaleDateString()}
-                          </Typography>
-                        </Grid>
+                {/* Expanded Details */}
+                <Collapse in={expandedCustomer === customerData.customer._id}>
+                  <Divider sx={{ my: 2.5 }} />
+                  <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 600, fontSize: '1rem', mb: 2 }}>
+                    Overdue Orders
+                  </Typography>
+
+                  <TableContainer component={Paper} variant="outlined" sx={{ border: '1px solid #e0e0e0' }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell><strong>Order #</strong></TableCell>
+                          <TableCell><strong>Order Date</strong></TableCell>
+                          <TableCell><strong>Due Date</strong></TableCell>
+                          <TableCell><strong>Final Deadline</strong></TableCell>
+                          <TableCell align="right"><strong>Total</strong></TableCell>
+                          <TableCell align="right"><strong>Paid</strong></TableCell>
+                          <TableCell align="right"><strong>Outstanding</strong></TableCell>
+                          <TableCell><strong>Status</strong></TableCell>
+                          <TableCell align="center"><strong>Action</strong></TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {customerData.overdueOrders.map((order) => {
+                          const orderDaysOverdue = Math.floor(
+                            (new Date() - new Date(order.allowed_until || order.due_date)) / (1000 * 60 * 60 * 24)
+                          )
+                          return (
+                            <TableRow key={order._id}>
+                              <TableCell>{order.order_number}</TableCell>
+                              <TableCell>
+                                {new Date(order.order_date || order.createdAt).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell>
+                                {order.due_date ? new Date(order.due_date).toLocaleDateString() : 'N/A'}
+                              </TableCell>
+                              <TableCell>
+                                {order.allowed_until ? (
+                                  <Box>
+                                    <Typography variant="body2">
+                                      {new Date(order.allowed_until).toLocaleDateString()}
+                                    </Typography>
+                                    <Typography variant="caption" color="error">
+                                      {orderDaysOverdue} days ago
+                                    </Typography>
+                                  </Box>
+                                ) : 'N/A'}
+                              </TableCell>
+                              <TableCell align="right">
+                                Rs {(order.subtotal_snapshot || 0).toFixed(2)}
+                              </TableCell>
+                              <TableCell align="right">
+                                Rs {(order.amount_paid_cash || 0).toFixed(2)}
+                              </TableCell>
+                              <TableCell align="right">
+                                <strong className="text-red-600">
+                                  Rs {(order.credit_outstanding || 0).toFixed(2)}
+                                </strong>
+                              </TableCell>
+                              <TableCell>
+                                <Chip
+                                  label={order.payment_status}
+                                  color={order.payment_status === 'Partially Paid' ? 'warning' : 'error'}
+                                  size="small"
+                                />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => handleOpenOrderPaymentDialog(customerData, order)}
+                                  disabled={isProcessing}
+                                  sx={{
+                                    borderColor: '#4caf5050',
+                                    color: '#4caf50',
+                                    '&:hover': {
+                                      borderColor: '#4caf50',
+                                      bgcolor: '#4caf5010'
+                                    }
+                                  }}
+                                >
+                                  Pay
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+
+                  {/* Customer Credit Info */}
+                  <Box sx={{ mt: 2.5, p: 2.5, bgcolor: '#f8f9fa', borderRadius: 2, border: '1px solid #e0e0e0' }}>
+                    <Grid container spacing={3}>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Current Balance</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                          Rs {(customerData.customer.current_balance || 0).toFixed(2)}
+                        </Typography>
                       </Grid>
-                    </Box>
-                  </Collapse>
-                </CardContent>
-              </Card>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Credit Limit</Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
+                          Rs {(customerData.customer.credit_limit || 0).toFixed(2)}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Available Credit</Typography>
+                        <Typography variant="body2" sx={{
+                          fontWeight: 600,
+                          fontSize: '0.9rem',
+                          color: (customerData.customer.credit_limit - customerData.customer.current_balance) > 0
+                            ? '#4caf50'
+                            : '#d32f2f'
+                        }}>
+                          Rs {Math.max(0, (customerData.customer.credit_limit || 0) - (customerData.customer.current_balance || 0)).toFixed(2)}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>Oldest Overdue</Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.9rem' }}>
+                          {new Date(customerData.oldestOverdueDate).toLocaleDateString()}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                </Collapse>
+              </CardContent>
+            </Card>
           ))}
         </Box>
       )}

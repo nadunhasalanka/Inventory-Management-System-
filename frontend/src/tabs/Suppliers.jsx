@@ -281,7 +281,7 @@ export default function Suppliers() {
     try {
       // Generate PO number
       const poNumber = `PO-${Date.now()}`
-      
+
       const poData = {
         po_number: poNumber,
         supplier_id: poFormData.supplierId,
@@ -304,7 +304,7 @@ export default function Suppliers() {
       await createPurchaseOrder(poData)
       setOpenPODialog(false)
       await loadPurchaseOrders()
-      
+
       alert(`✅ Purchase Order ${poNumber} created successfully!\n\n📧 An email notification has been sent to the supplier.`)
     } catch (error) {
       console.error('Failed to create PO:', error)
@@ -345,9 +345,9 @@ export default function Suppliers() {
     console.log('PO Data:', po)
     console.log('PO Line Items:', po.line_items)
     console.log('Locations available:', locations)
-    
+
     const defaultLocation = locations.length > 0 ? locations[0]._id : ""
-    
+
     setGrnFormData({
       supplierId: po.supplier_id?._id || po.supplier_id,
       supplierName: po.supplier_id?.name || suppliers.find(s => s._id === po.supplier_id)?.name || "",
@@ -358,14 +358,14 @@ export default function Suppliers() {
       receiptDate: new Date().toISOString().split("T")[0],
       notes: "",
     })
-    
+
     // Map PO line items to GRN items - handle missing line_items
     if (!po.line_items || po.line_items.length === 0) {
       console.error('❌ No line items found in PO!')
       alert('This PO has no line items. Cannot receive goods.')
       return
     }
-    
+
     const mappedItems = po.line_items.map((item) => ({
       lineItemId: item._id,
       productId: item.product_id?._id || item.product_id,
@@ -373,10 +373,10 @@ export default function Suppliers() {
       quantityOrdered: item.quantity_ordered,
       quantity: item.quantity_ordered // Default to full quantity
     }))
-    
+
     console.log('Mapped GRN Items:', mappedItems)
     setGrnItems(mappedItems)
-    
+
     console.log('✅ Opening GRN dialog...')
     setOpenGRNDialog(true)
   }
@@ -437,7 +437,7 @@ export default function Suppliers() {
 
     try {
       const grnNumber = `GRN-${Date.now()}`
-      
+
       const receiveData = {
         grn_number: grnNumber,
         location_id: grnFormData.locationId,
@@ -452,7 +452,7 @@ export default function Suppliers() {
 
       console.log('Receiving goods with data:', receiveData)
       await receivePurchaseOrder(grnFormData.poId, receiveData)
-      
+
       setOpenGRNDialog(false)
       await loadGoodsReceived()
       await loadPurchaseOrders()
@@ -467,7 +467,7 @@ export default function Suppliers() {
   const handleCreatePaymentFromGRN = (grn) => {
     // Calculate total from GRN items (since backend doesn't store total in GRN)
     const total = 0 // Will need to calculate if needed
-    
+
     setPaymentFormData({
       supplierId: grn.supplier_id,
       supplierName: suppliers.find(s => s._id === grn.supplier_id)?.name || "",
@@ -503,7 +503,7 @@ export default function Suppliers() {
 
   const handleMarkAsPaid = (po) => {
     const total = po.line_items?.reduce((sum, item) => sum + (item.total_cost || 0), 0) || 0
-    
+
     setPaymentFormData({
       supplierId: po.supplier_id?._id || po.supplier_id,
       supplierName: po.supplier_id?.name || suppliers.find(s => s._id === po.supplier_id)?.name || "",
@@ -522,7 +522,7 @@ export default function Suppliers() {
 
   const handleSubmitPayment = async (e) => {
     e.preventDefault()
-    
+
     try {
       await createSupplierPayment({
         poId: paymentFormData.poId,
@@ -531,7 +531,7 @@ export default function Suppliers() {
         paymentMethod: paymentFormData.paymentMethod,
         referenceNumber: paymentFormData.referenceNumber
       })
-      
+
       setOpenPaymentDialog(false)
       await loadPurchaseOrders() // Reload to get updated payment status
       await loadSupplierPayments()
@@ -556,7 +556,7 @@ export default function Suppliers() {
           <Tab label="Purchase Orders" />
           <Tab label="History" />
         </Tabs>
-        
+
         {subTab === 0 && (
           <Button variant="contained" startIcon={<Add />} onClick={handleAddNew}>
             Add Supplier
@@ -655,6 +655,7 @@ export default function Suppliers() {
                     onChange={(e) => setFormData({ ...formData, paymentTerms: e.target.value })}
                     placeholder="e.g., Net 30, Net 60, COD"
                   />
+
                   <TextField
                     label="Address"
                     fullWidth
@@ -826,79 +827,79 @@ export default function Suppliers() {
                 {purchaseOrders
                   .filter(po => po.status?.toLowerCase() !== "received" && po.status?.toLowerCase() !== "cancelled")
                   .map((po) => (
-                  <TableRow key={po._id || po.id} hover>
-                    <TableCell sx={{ py: 1.5 }}>{po.po_number || po.poNumber}</TableCell>
-                    <TableCell sx={{ py: 1.5 }}>{po.supplier_id?.name || po.supplierName}</TableCell>
-                    <TableCell sx={{ py: 1.5 }}>{new Date(po.order_date || po.orderDate).toLocaleDateString()}</TableCell>
-                    <TableCell sx={{ py: 1.5 }}>
-                      {(po.expected_delivery_date || po.expectedDelivery) 
-                        ? new Date(po.expected_delivery_date || po.expectedDelivery).toLocaleDateString() 
-                        : "-"}
-                    </TableCell>
-                    <TableCell align="right" sx={{ py: 1.5 }}>
-                      Rs {(po.line_items?.reduce((sum, item) => sum + (item.total_cost || 0), 0) || 0).toFixed(2)}
-                    </TableCell>
-                    <TableCell sx={{ py: 1.5 }}>
-                      <Chip 
-                        label={po.invoice_details?.payment_status || "Pending"} 
-                        color={
-                          po.invoice_details?.payment_status === "Paid" ? "success" : 
-                          po.invoice_details?.payment_status === "Partially Paid" ? "warning" : 
-                          "default"
-                        } 
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell sx={{ py: 1.5 }}>
-                      <Chip 
-                        label={
-                          po.status?.toLowerCase() === "received" ? "Received" :
-                          po.status?.toLowerCase() === "partially received" ? "Partial" :
-                          "Pending"
-                        } 
-                        color={getStatusColor(po.status)} 
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell align="right" sx={{ py: 1.5 }}>
-                      <div className="flex justify-end gap-1">
-                        {po.invoice_details?.payment_status !== "Paid" && (
+                    <TableRow key={po._id || po.id} hover>
+                      <TableCell sx={{ py: 1.5 }}>{po.po_number || po.poNumber}</TableCell>
+                      <TableCell sx={{ py: 1.5 }}>{po.supplier_id?.name || po.supplierName}</TableCell>
+                      <TableCell sx={{ py: 1.5 }}>{new Date(po.order_date || po.orderDate).toLocaleDateString()}</TableCell>
+                      <TableCell sx={{ py: 1.5 }}>
+                        {(po.expected_delivery_date || po.expectedDelivery)
+                          ? new Date(po.expected_delivery_date || po.expectedDelivery).toLocaleDateString()
+                          : "-"}
+                      </TableCell>
+                      <TableCell align="right" sx={{ py: 1.5 }}>
+                        Rs {(po.line_items?.reduce((sum, item) => sum + (item.total_cost || 0), 0) || 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell sx={{ py: 1.5 }}>
+                        <Chip
+                          label={po.invoice_details?.payment_status || "Pending"}
+                          color={
+                            po.invoice_details?.payment_status === "Paid" ? "success" :
+                              po.invoice_details?.payment_status === "Partially Paid" ? "warning" :
+                                "default"
+                          }
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell sx={{ py: 1.5 }}>
+                        <Chip
+                          label={
+                            po.status?.toLowerCase() === "received" ? "Received" :
+                              po.status?.toLowerCase() === "partially received" ? "Partial" :
+                                "Pending"
+                          }
+                          color={getStatusColor(po.status)}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell align="right" sx={{ py: 1.5 }}>
+                        <div className="flex justify-end gap-1">
+                          {po.invoice_details?.payment_status !== "Paid" && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="primary"
+                              onClick={() => handleMarkAsPaid(po)}
+                              sx={{ fontSize: '0.7rem', py: 0.5, px: 1.5, minWidth: 'auto' }}
+                            >
+                              Mark Paid
+                            </Button>
+                          )}
+
+                          {(po.status?.toLowerCase() === "draft" || po.status?.toLowerCase() === "sent" || po.status?.toLowerCase() === "partially received") && (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="success"
+                              onClick={() => handleCreateGRNFromPO(po)}
+                              sx={{ fontSize: '0.7rem', py: 0.5, px: 1.5, minWidth: 'auto' }}
+                            >
+                              Receive
+                            </Button>
+                          )}
+
                           <Button
                             size="small"
                             variant="outlined"
-                            color="primary"
-                            onClick={() => handleMarkAsPaid(po)}
+                            color="error"
+                            onClick={() => handleCancelPO(po._id || po.id)}
                             sx={{ fontSize: '0.7rem', py: 0.5, px: 1.5, minWidth: 'auto' }}
                           >
-                            Mark Paid
+                            Cancel
                           </Button>
-                        )}
-                        
-                        {(po.status?.toLowerCase() === "draft" || po.status?.toLowerCase() === "sent" || po.status?.toLowerCase() === "partially received") && (
-                          <Button
-                            size="small"
-                            variant="contained"
-                            color="success"
-                            onClick={() => handleCreateGRNFromPO(po)}
-                            sx={{ fontSize: '0.7rem', py: 0.5, px: 1.5, minWidth: 'auto' }}
-                          >
-                            Receive
-                          </Button>
-                        )}
-                        
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="error"
-                          onClick={() => handleCancelPO(po._id || po.id)}
-                          sx={{ fontSize: '0.7rem', py: 0.5, px: 1.5, minWidth: 'auto' }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 {purchaseOrders.filter(po => po.status?.toLowerCase() !== "received" && po.status?.toLowerCase() !== "cancelled").length === 0 && (
                   <TableRow>
                     <TableCell colSpan={8} align="center" className="py-8 text-slate-500">
@@ -918,7 +919,7 @@ export default function Suppliers() {
                 <div className="space-y-3 mt-2">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <TextField label="Supplier" value={grnFormData.supplierName} disabled fullWidth />
-                    
+
                     <FormControl fullWidth required error={!grnFormData.locationId}>
                       <InputLabel>Warehouse Location *</InputLabel>
                       <Select
@@ -947,7 +948,7 @@ export default function Suppliers() {
                         </Typography>
                       )}
                     </FormControl>
-                    
+
                     <TextField
                       label="Receipt Date"
                       type="date"
@@ -957,7 +958,7 @@ export default function Suppliers() {
                       onChange={(e) => setGrnFormData({ ...grnFormData, receiptDate: e.target.value })}
                       InputLabelProps={{ shrink: true }}
                     />
-                    
+
                     <TextField label="PO Number" value={grnFormData.poNumber} disabled fullWidth />
                   </div>
 
@@ -987,9 +988,9 @@ export default function Suppliers() {
                         />
                         <div className="col-span-4 flex items-center gap-2">
                           {item.quantityOrdered && item.quantity !== item.quantityOrdered && (
-                            <Chip 
-                              label={`Short: ${item.quantityOrdered - item.quantity}`} 
-                              color="warning" 
+                            <Chip
+                              label={`Short: ${item.quantityOrdered - item.quantity}`}
+                              color="warning"
                               size="small"
                             />
                           )}
@@ -1028,7 +1029,7 @@ export default function Suppliers() {
                 <div className="space-y-3 mt-2">
                   <TextField label="Supplier" value={paymentFormData.supplierName} disabled fullWidth />
                   <TextField label="PO Number" value={paymentFormData.poNumber} disabled fullWidth />
-                  
+
                   <TextField
                     label="Payment Amount"
                     type="number"
@@ -1114,51 +1115,51 @@ export default function Suppliers() {
               {purchaseOrders
                 .filter(po => po.status?.toLowerCase() === "received" || po.status?.toLowerCase() === "cancelled")
                 .map((po) => (
-                <TableRow key={po._id || po.id} hover>
-                  <TableCell sx={{ py: 1.5 }}>{po.po_number || po.poNumber}</TableCell>
-                  <TableCell sx={{ py: 1.5 }}>{po.supplier_id?.name || po.supplierName}</TableCell>
-                  <TableCell sx={{ py: 1.5 }}>{new Date(po.order_date || po.orderDate).toLocaleDateString()}</TableCell>
-                  <TableCell sx={{ py: 1.5 }}>
-                    {po.goods_receipts && po.goods_receipts.length > 0
-                      ? new Date(po.goods_receipts[po.goods_receipts.length - 1].received_date).toLocaleDateString()
-                      : "-"}
-                  </TableCell>
-                  <TableCell align="right" sx={{ py: 1.5 }}>
-                    Rs {(po.line_items?.reduce((sum, item) => sum + (item.total_cost || 0), 0) || 0).toFixed(2)}
-                  </TableCell>
-                  <TableCell sx={{ py: 1.5 }}>
-                    <Chip 
-                      label={po.invoice_details?.payment_status || "Pending"} 
-                      color={
-                        po.invoice_details?.payment_status === "Paid" ? "success" : 
-                        po.invoice_details?.payment_status === "Partially Paid" ? "warning" : 
-                        "default"
-                      } 
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell sx={{ py: 1.5 }}>
-                    <Chip 
-                      label={po.status?.toLowerCase() === "cancelled" ? "Cancelled" : "Received"} 
-                      color={po.status?.toLowerCase() === "cancelled" ? "error" : "success"} 
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell align="right" sx={{ py: 1.5 }}>
-                    {po.invoice_details?.payment_status !== "Paid" && (
-                      <Button
+                  <TableRow key={po._id || po.id} hover>
+                    <TableCell sx={{ py: 1.5 }}>{po.po_number || po.poNumber}</TableCell>
+                    <TableCell sx={{ py: 1.5 }}>{po.supplier_id?.name || po.supplierName}</TableCell>
+                    <TableCell sx={{ py: 1.5 }}>{new Date(po.order_date || po.orderDate).toLocaleDateString()}</TableCell>
+                    <TableCell sx={{ py: 1.5 }}>
+                      {po.goods_receipts && po.goods_receipts.length > 0
+                        ? new Date(po.goods_receipts[po.goods_receipts.length - 1].received_date).toLocaleDateString()
+                        : "-"}
+                    </TableCell>
+                    <TableCell align="right" sx={{ py: 1.5 }}>
+                      Rs {(po.line_items?.reduce((sum, item) => sum + (item.total_cost || 0), 0) || 0).toFixed(2)}
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5 }}>
+                      <Chip
+                        label={po.invoice_details?.payment_status || "Pending"}
+                        color={
+                          po.invoice_details?.payment_status === "Paid" ? "success" :
+                            po.invoice_details?.payment_status === "Partially Paid" ? "warning" :
+                              "default"
+                        }
                         size="small"
-                        variant="outlined"
-                        color="primary"
-                        onClick={() => handleMarkAsPaid(po)}
-                        sx={{ fontSize: '0.7rem', py: 0.5, px: 1.5, minWidth: 'auto' }}
-                      >
-                        Mark Paid
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5 }}>
+                      <Chip
+                        label={po.status?.toLowerCase() === "cancelled" ? "Cancelled" : "Received"}
+                        color={po.status?.toLowerCase() === "cancelled" ? "error" : "success"}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell align="right" sx={{ py: 1.5 }}>
+                      {po.invoice_details?.payment_status !== "Paid" && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                          onClick={() => handleMarkAsPaid(po)}
+                          sx={{ fontSize: '0.7rem', py: 0.5, px: 1.5, minWidth: 'auto' }}
+                        >
+                          Mark Paid
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
               {purchaseOrders.filter(po => po.status?.toLowerCase() === "received" || po.status?.toLowerCase() === "cancelled").length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} align="center" className="py-8 text-slate-500">

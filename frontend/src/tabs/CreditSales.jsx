@@ -24,8 +24,9 @@ import {
   InputLabel,
   Select,
   Box,
+  Paper,
 } from "@mui/material"
-import { ReceiptLong, QrCode2, Add, Delete, Close, Warning, CheckCircle } from "@mui/icons-material"
+import { ReceiptLong, Delete, Close, Warning, CheckCircle } from "@mui/icons-material"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { fetchProducts } from "../services/productApi"
 import { fetchCustomers, createCustomer } from "../services/customersApi"
@@ -53,6 +54,7 @@ export default function CreditSales() {
 
   const [showInvoice, setShowInvoice] = useState(false)
   const [invoiceData, setInvoiceData] = useState(null)
+  const [isPreviewMode, setIsPreviewMode] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [selectedLocationId, setSelectedLocationId] = useState("")
   const [showVariantDialog, setShowVariantDialog] = useState(false)
@@ -121,9 +123,9 @@ export default function CreditSales() {
 
       return existingItem
         ? prev.map((p) => {
-            const cartKey = p.variant ? `${p.sku}-${p.variant.name}-${p.variant.value}` : p.sku
-            return cartKey === itemKey ? { ...p, qty: p.qty + 1 } : p
-          })
+          const cartKey = p.variant ? `${p.sku}-${p.variant.name}-${p.variant.value}` : p.sku
+          return cartKey === itemKey ? { ...p, qty: p.qty + 1 } : p
+        })
         : [...prev, { ...mapped, qty: 1 }]
     })
   }
@@ -220,7 +222,7 @@ export default function CreditSales() {
       idNumber: null,
     }
 
-  const invoiceRecord = {
+    const invoiceRecord = {
       invoiceNumber: `INV-${Date.now()}`,
       timestamp: new Date().toISOString(),
       customer: customerData,
@@ -253,419 +255,448 @@ export default function CreditSales() {
     setShowInvoice(false)
     setInvoiceData(null)
     setSelectedCustomer(null)
-    setInvoiceDetails({ dueDate: "", allowedDelay: 7 })
+    setInvoiceDetails({ dueDate: oneMonthFromNow, allowedDelay: 7 })
+  }
+
+  const handlePreviewInvoice = async () => {
+    if (cart.length === 0 || !selectedCustomer) {
+      alert("Please select a customer and add items to cart")
+      return
+    }
+
+    // Generate preview invoice data without fiscalizing
+    const customerData = {
+      name: selectedCustomer.name,
+      phone: null,
+      idNumber: null,
+    }
+    const invoiceRecord = {
+      invoiceNumber: `PREVIEW-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      customer: customerData,
+      items: cart.map(item => ({
+        name: item.displayName || item.name,
+        quantity: item.qty,
+        price: item.price,
+        total: item.qty * item.price
+      })),
+      discount: discountAmount,
+      discountType: discount.type,
+      discountValue: discount.value,
+      subtotal: subtotal,
+      total: total,
+      dueDate: invoiceDetails.dueDate,
+      allowedDelay: invoiceDetails.allowedDelay,
+    }
+
+    setInvoiceData(invoiceRecord)
+    setIsPreviewMode(true)
+    setShowInvoice(true)
+  }
+
+  const handlePrintInvoice = () => {
+    window.print()
   }
 
   return (
     <>
       <Section title="Credit Sales" breadcrumbs={["Home", "Sales", "Credit"]}>
-        <div style={{ 
-          display: 'flex', 
+        <div style={{
+          display: 'flex',
           gap: '16px',
           flexWrap: 'wrap'
         }}>
-        
-        {/* Payment Summary - LEFT COLUMN */}
-        <div style={{ width: '350px', flexShrink: 0 }}>
-          <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005', height: '100%' }}>
-            <CardContent sx={{ p: 2.5, display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 2 }}>
-                Payment Summary
-              </Typography>
 
-              <Box sx={{ flex: 1, overflowY: 'auto', pr: 1, mb: 2 }}>
-              {/* Customer Selection */}
-              <Box sx={{ mb: 2 }}>
-                <Autocomplete
-                  options={customers}
-                  getOptionLabel={(option) => `${option.name} - ${option.email}`}
-                  value={selectedCustomer}
-                  onChange={(_, newValue) => setSelectedCustomer(newValue)}
-                  inputValue={customerSearch}
-                  onInputChange={(_, newInputValue) => setCustomerSearch(newInputValue)}
-                  size="small"
-                  renderInput={(params) => (
-                    <TextField {...params} label="Select Customer" placeholder="Search by name or email" />
-                  )}
-                  renderOption={(props, option) => (
-                    <li {...props}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{option.name}</span>
-                        <span className="text-xs text-slate-500">
-                          Debt: Rs {Number(option.current_balance || 0).toFixed(2)} / Rs {Number(option.credit_limit || 0).toFixed(2)}
-                        </span>
-                      </div>
-                    </li>
-                  )}
-                />
-              </Box>
+          {/* Payment Summary - LEFT COLUMN */}
+          <div style={{ width: '350px', flexShrink: 0 }}>
+            <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005', height: '100%' }}>
+              <CardContent sx={{ p: 2.5, display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 2 }}>
+                  Payment Summary
+                </Typography>
 
-              {/* Location selection */}
-              <Box sx={{ mb: 2 }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Location</InputLabel>
-                  <Select value={selectedLocationId} label="Location" onChange={(e) => setSelectedLocationId(e.target.value)}>
-                    {locations.map((l) => (
-                      <MenuItem key={l._id} value={l._id}>
-                        {l.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-
-              {/* Due Date and Allowed Delay */}
-              <Box sx={{ mb: 2 }}>
-                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                  <TextField
-                    type="date"
-                    label="Due Date"
-                    name="dueDate"
-                    value={invoiceDetails.dueDate}
-                    onChange={handleInvoiceChange}
-                    InputLabelProps={{ shrink: true }}
-                    fullWidth
-                    size="small"
-                  />
-                  <TextField
-                    label="Delay (days)"
-                    name="allowedDelay"
-                    type="number"
-                    value={invoiceDetails.allowedDelay}
-                    onChange={handleInvoiceChange}
-                    fullWidth
-                    size="small"
-                  />
-                </Box>
-              </Box>
-
-              {/* Display calculated allowed_until date */}
-              {invoiceDetails.dueDate && invoiceDetails.allowedDelay > 0 && (
-                <Box sx={{ mb: 2 }}>
-                  <Alert severity="info" icon={<CheckCircle />} sx={{ fontSize: '0.8rem', py: 0.5 }}>
-                    Deadline: {' '}
-                    <strong>
-                      {(() => {
-                        const allowedUntil = new Date(invoiceDetails.dueDate)
-                        allowedUntil.setDate(allowedUntil.getDate() + Number(invoiceDetails.allowedDelay))
-                        return allowedUntil.toLocaleDateString()
-                      })()}
-                    </strong>
-                  </Alert>
-                </Box>
-              )}
-
-              {/* Customer Debt Alert */}
-              {selectedCustomer && (
-                <Box sx={{ mb: 2 }}>
-                  <Alert
-                    severity={currentDebt > maxDebt * 0.8 ? "warning" : "info"}
-                    icon={currentDebt > maxDebt * 0.8 ? <Warning /> : <CheckCircle />}
-                    sx={{ fontSize: '0.8rem', py: 0.5 }}
-                  >
-                    Debt: Rs {currentDebt.toFixed(2)} / Rs {maxDebt.toFixed(2)}
-                  </Alert>
-                </Box>
-              )}
-
-              {/* Discount */}
-              <Box sx={{ mb: 2 }}>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  <TextField
-                    select
-                    label="Discount Type"
-                    value={discount.type}
-                    onChange={(e) => setDiscount((prev) => ({ ...prev, type: e.target.value }))}
-                    sx={{ width: 120 }}
-                    size="small"
-                  >
-                    <MenuItem value="percentage">%</MenuItem>
-                    <MenuItem value="fixed">Rs</MenuItem>
-                  </TextField>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    label="Discount"
-                    value={discount.value}
-                    onChange={(e) => setDiscount((prev) => ({ ...prev, value: Number.parseFloat(e.target.value) || 0 }))}
-                    inputProps={{ min: 0, step: 0.01 }}
-                    size="small"
-                  />
-                </Box>
-              </Box>
-
-              <Divider sx={{ my: 2 }} />
-
-              {/* Balance & Terms Section */}
-              {selectedCustomer && (
-                <>
+                <Box sx={{ flex: 1, overflowY: 'auto', pr: 1, mb: 2 }}>
+                  {/* Customer Selection */}
                   <Box sx={{ mb: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
-                      <span>Current Debt</span>
-                      <Typography sx={{ fontWeight: 600 }}>Rs {currentDebt.toFixed(2)}</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem', color: '#4caf50' }}>
-                      <span>New Sale</span>
-                      <Typography sx={{ fontWeight: 600 }}>+Rs {total.toFixed(2)}</Typography>
-                    </Box>
-                    <Divider sx={{ my: 1.5 }} />
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                      <Typography sx={{ fontWeight: 600 }}>New Total Debt</Typography>
-                      <Typography sx={{ fontWeight: 700, color: !canProceed ? '#d32f2f' : 'inherit' }}>
-                        Rs {newDebt.toFixed(2)}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: 'text.secondary' }}>
-                      <span>Credit Limit</span>
-                      <span>Rs {maxDebt.toFixed(2)}</span>
-                    </Box>
-                  </Box>
-
-                  <Box sx={{ mb: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'text.secondary', mb: 1 }}>
-                      <span>Credit Usage</span>
-                      <span>{debtPercentage.toFixed(0)}%</span>
-                    </Box>
-                    <LinearProgress
-                      variant="determinate"
-                      value={Math.min(debtPercentage, 100)}
-                      color={debtPercentage > 100 ? "error" : debtPercentage > 80 ? "warning" : "primary"}
-                      sx={{ height: 8, borderRadius: 1 }}
+                    <Autocomplete
+                      options={customers}
+                      getOptionLabel={(option) => `${option.name} - ${option.email}`}
+                      value={selectedCustomer}
+                      onChange={(_, newValue) => setSelectedCustomer(newValue)}
+                      inputValue={customerSearch}
+                      onInputChange={(_, newInputValue) => setCustomerSearch(newInputValue)}
+                      size="small"
+                      renderInput={(params) => (
+                        <TextField {...params} label="Select Customer" placeholder="Search by name or email" />
+                      )}
+                      renderOption={(props, option) => (
+                        <li {...props}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{option.name}</span>
+                            <span className="text-xs text-slate-500">
+                              Debt: Rs {Number(option.current_balance || 0).toFixed(2)} / Rs {Number(option.credit_limit || 0).toFixed(2)}
+                            </span>
+                          </div>
+                        </li>
+                      )}
                     />
                   </Box>
 
-                  {!canProceed && (
+                  {/* Location selection */}
+                  <Box sx={{ mb: 2 }}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Location</InputLabel>
+                      <Select value={selectedLocationId} label="Location" onChange={(e) => setSelectedLocationId(e.target.value)}>
+                        {locations.map((l) => (
+                          <MenuItem key={l._id} value={l._id}>
+                            {l.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Box>
+
+                  {/* Due Date and Allowed Delay */}
+                  <Box sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                      <TextField
+                        type="date"
+                        label="Due Date"
+                        name="dueDate"
+                        value={invoiceDetails.dueDate}
+                        onChange={handleInvoiceChange}
+                        InputLabelProps={{ shrink: true }}
+                        fullWidth
+                        size="small"
+                      />
+                      <TextField
+                        label="Delay (days)"
+                        name="allowedDelay"
+                        type="number"
+                        value={invoiceDetails.allowedDelay}
+                        onChange={handleInvoiceChange}
+                        fullWidth
+                        size="small"
+                      />
+                    </Box>
+                  </Box>
+
+                  {/* Display calculated allowed_until date */}
+                  {invoiceDetails.dueDate && invoiceDetails.allowedDelay > 0 && (
                     <Box sx={{ mb: 2 }}>
-                      <Alert severity="error" sx={{ fontSize: '0.875rem' }}>
-                        Credit limit exceeded! Cannot proceed with this sale.
+                      <Alert severity="info" icon={<CheckCircle />} sx={{ fontSize: '0.8rem', py: 0.5 }}>
+                        Deadline: {' '}
+                        <strong>
+                          {(() => {
+                            const allowedUntil = new Date(invoiceDetails.dueDate)
+                            allowedUntil.setDate(allowedUntil.getDate() + Number(invoiceDetails.allowedDelay))
+                            return allowedUntil.toLocaleDateString()
+                          })()}
+                        </strong>
                       </Alert>
                     </Box>
                   )}
 
-                  <Divider sx={{ my: 2 }} />
-                </>
-              )}
-
-              {/* Price Summary - NO TAX */}
-              <Box sx={{ mb: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
-                  <span>Subtotal</span>
-                  <Typography sx={{ fontWeight: 500 }}>Rs {subtotal.toFixed(2)}</Typography>
-                </Box>
-                {discountAmount > 0 && (
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem', color: '#4caf50' }}>
-                    <span>Discount ({discount.type === "percentage" ? `${discount.value}%` : "Rs"})</span>
-                    <Typography sx={{ fontWeight: 500 }}>-Rs {discountAmount.toFixed(2)}</Typography>
-                  </Box>
-                )}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: 600, pt: 1 }}>
-                  <span>Total</span>
-                  <span>Rs {total.toFixed(2)}</span>
-                </Box>
-              </Box>
-
-              {/* Buttons */}
-              <Box>
-                <Button
-                  variant="contained"
-                  startIcon={<ReceiptLong />}
-                  onClick={handleGenerateInvoice}
-                  disabled={
-                    !selectedCustomer || cart.length === 0 || !canProceed || !invoiceDetails.dueDate || isProcessing
-                  }
-                  fullWidth
-                  sx={{
-                    mb: 1.5,
-                    bgcolor: '#4caf50',
-                    '&:hover': { bgcolor: '#45a049' }
-                  }}
-                >
-                  {isProcessing ? "Processing..." : "Create Credit Invoice"}
-                </Button>
-                <Button 
-                  variant="outlined" 
-                  startIcon={<QrCode2 />} 
-                  disabled 
-                  size="small"
-                  fullWidth
-                  sx={{ borderColor: '#4caf5050', color: '#4caf50' }}
-                >
-                  Preview Invoice
-                </Button>
-              </Box>
-
-              </Box>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Items Selection - RIGHT COLUMN */}
-        <div style={{ flex: 1, minWidth: '500px' }}>
-          <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 2 }}>
-                Select Items
-              </Typography>
-
-              {/* Search Bar */}
-              <Box sx={{ mb: 2 }}>
-                <SearchInput 
-                  placeholder="Search products by name or SKU..." 
-                  value={query} 
-                  onChange={setQuery}
-                />
-              </Box>
-
-              {/* Product Grid */}
-              <Box sx={{ mb: 3 }}>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
-                  gap: 10,
-                  maxHeight: '320px',
-                  overflowY: 'auto',
-                  padding: 4
-                }}>
-                  {loadingProducts ? (
-                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem 0', color: '#64748b' }}>
-                      Loading products...
-                    </div>
-                  ) : pool.length === 0 ? (
-                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem 0', color: '#64748b' }}>
-                      No products found
-                    </div>
-                  ) : (
-                    pool.slice(0, 15).map((p) => (
-                      <Button
-                        key={p.sku}
-                        variant="outlined"
-                        onClick={() => handleProductClick(p)}
-                        size="small"
-                        sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start',
-                          height: 95,
-                          p: 1.5,
-                          borderColor: '#4caf5050',
-                          textAlign: 'left',
-                          '&:hover': {
-                            borderColor: '#4caf50',
-                            bgcolor: '#4caf5010'
-                          }
-                        }}
+                  {/* Customer Debt Alert */}
+                  {selectedCustomer && (
+                    <Box sx={{ mb: 2 }}>
+                      <Alert
+                        severity={currentDebt > maxDebt * 0.8 ? "warning" : "info"}
+                        icon={currentDebt > maxDebt * 0.8 ? <Warning /> : <CheckCircle />}
+                        sx={{ fontSize: '0.8rem', py: 0.5 }}
                       >
-                        <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', width: '100%' }}>{p.name}</span>
-                        <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
-                          <span style={{ fontWeight: 700, fontSize: 13 }}>Rs {Number(p.selling_price ?? p.price ?? 0).toFixed(2)}</span>
-                          {p.variants && p.variants.length > 0 && (
-                            <Chip 
-                              label={`${p.variants.length}v`} 
-                              size="small" 
-                              sx={{ 
-                                height: 16, 
-                                fontSize: '0.6rem',
-                                bgcolor: '#4caf5020',
-                                color: '#4caf50'
-                              }} 
-                            />
-                          )}
-                        </div>
-                      </Button>
-                    ))
-                  )}
-                </div>
-              </Box>
-
-              <Divider sx={{ my: 3 }} />
-
-              {/* Cart Items */}
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, fontSize: '0.9rem' }}>
-                  Cart Items
-                </Typography>
-                {cart.length === 0 && (
-                  <Typography color="text.secondary" sx={{ fontSize: '0.875rem' }}>
-                    No items added yet
-                  </Typography>
-                )}
-                {cart.map((c, index) => {
-                  const itemKey = c.variant 
-                    ? `${c.sku}-${c.variant.name}-${c.variant.value}-${index}` 
-                    : `${c.sku}-${index}`
-                  return (
-                    <Box key={itemKey} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 2, borderRadius: 2, bgcolor: '#f8f9fa', mb: 2 }}>
-                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {c.displayName || c.name}
-                          {c.variant && c.variant.additional_price !== 0 && (
-                            <span style={{ fontSize: '0.75rem', color: '#4caf50', marginLeft: '4px' }}>
-                              (+Rs {c.variant.additional_price.toFixed(2)})
-                            </span>
-                          )}
-                        </Typography>
-                        <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
-                          {c.qty} × Rs {c.price.toFixed(2)} = Rs {(c.qty * c.price).toFixed(2)}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <IconButton
-                          size="small"
-                          onClick={() =>
-                            setCart((prev) => {
-                              const cartKey = c.variant 
-                                ? `${c.sku}-${c.variant.name}-${c.variant.value}` 
-                                : c.sku
-                              return prev.map((p, i) => {
-                                const pKey = p.variant 
-                                  ? `${p.sku}-${p.variant.name}-${p.variant.value}` 
-                                  : p.sku
-                                return pKey === cartKey && i === index 
-                                  ? { ...p, qty: Math.max(1, p.qty - 1) } 
-                                  : p
-                              })
-                            })
-                          }
-                        >
-                          -
-                        </IconButton>
-                        <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, minWidth: 24, textAlign: 'center' }}>{c.qty}</Typography>
-                        <IconButton
-                          size="small"
-                          onClick={() =>
-                            setCart((prev) => {
-                              const cartKey = c.variant 
-                                ? `${c.sku}-${c.variant.name}-${c.variant.value}` 
-                                : c.sku
-                              return prev.map((p, i) => {
-                                const pKey = p.variant 
-                                  ? `${p.sku}-${p.variant.name}-${p.variant.value}` 
-                                  : p.sku
-                                return pKey === cartKey && i === index ? { ...p, qty: p.qty + 1 } : p
-                              })
-                            })
-                          }
-                        >
-                          +
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => setCart((prev) => prev.filter((_, i) => i !== index))}
-                        >
-                          <Delete fontSize="small" />
-                        </IconButton>
-                      </Box>
+                        Debt: Rs {currentDebt.toFixed(2)} / Rs {maxDebt.toFixed(2)}
+                      </Alert>
                     </Box>
-                  )
-                })}
-              </Box>
-            </CardContent>
-          </Card>
-        </div>
+                  )}
 
-      </div>
+                  {/* Discount */}
+                  <Box sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <TextField
+                        select
+                        label="Discount Type"
+                        value={discount.type}
+                        onChange={(e) => setDiscount((prev) => ({ ...prev, type: e.target.value }))}
+                        sx={{ width: 120 }}
+                        size="small"
+                      >
+                        <MenuItem value="percentage">%</MenuItem>
+                        <MenuItem value="fixed">Rs</MenuItem>
+                      </TextField>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Discount"
+                        value={discount.value}
+                        onChange={(e) => setDiscount((prev) => ({ ...prev, value: Number.parseFloat(e.target.value) || 0 }))}
+                        inputProps={{ min: 0, step: 0.01 }}
+                        size="small"
+                      />
+                    </Box>
+                  </Box>
+
+                  <Divider sx={{ my: 2 }} />
+
+                  {/* Balance & Terms Section */}
+                  {selectedCustomer && (
+                    <>
+                      <Box sx={{ mb: 2 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
+                          <span>Current Debt</span>
+                          <Typography sx={{ fontWeight: 600 }}>Rs {currentDebt.toFixed(2)}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem', color: '#4caf50' }}>
+                          <span>New Sale</span>
+                          <Typography sx={{ fontWeight: 600 }}>+Rs {total.toFixed(2)}</Typography>
+                        </Box>
+                        <Divider sx={{ my: 1.5 }} />
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography sx={{ fontWeight: 600 }}>New Total Debt</Typography>
+                          <Typography sx={{ fontWeight: 700, color: !canProceed ? '#d32f2f' : 'inherit' }}>
+                            Rs {newDebt.toFixed(2)}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: 'text.secondary' }}>
+                          <span>Credit Limit</span>
+                          <span>Rs {maxDebt.toFixed(2)}</span>
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ mb: 2 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'text.secondary', mb: 1 }}>
+                          <span>Credit Usage</span>
+                          <span>{debtPercentage.toFixed(0)}%</span>
+                        </Box>
+                        <LinearProgress
+                          variant="determinate"
+                          value={Math.min(debtPercentage, 100)}
+                          color={debtPercentage > 100 ? "error" : debtPercentage > 80 ? "warning" : "primary"}
+                          sx={{ height: 8, borderRadius: 1 }}
+                        />
+                      </Box>
+
+                      {!canProceed && (
+                        <Box sx={{ mb: 2 }}>
+                          <Alert severity="error" sx={{ fontSize: '0.875rem' }}>
+                            Credit limit exceeded! Cannot proceed with this sale.
+                          </Alert>
+                        </Box>
+                      )}
+
+                      <Divider sx={{ my: 2 }} />
+                    </>
+                  )}
+
+                  {/* Price Summary - NO TAX */}
+                  <Box sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
+                      <span>Subtotal</span>
+                      <Typography sx={{ fontWeight: 500 }}>Rs {subtotal.toFixed(2)}</Typography>
+                    </Box>
+                    {discountAmount > 0 && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem', color: '#4caf50' }}>
+                        <span>Discount ({discount.type === "percentage" ? `${discount.value}%` : "Rs"})</span>
+                        <Typography sx={{ fontWeight: 500 }}>-Rs {discountAmount.toFixed(2)}</Typography>
+                      </Box>
+                    )}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: 600, pt: 1 }}>
+                      <span>Total</span>
+                      <span>Rs {total.toFixed(2)}</span>
+                    </Box>
+                  </Box>
+
+                  {/* Buttons */}
+                  <Box>
+                    <Button
+                      variant="contained"
+                      startIcon={<ReceiptLong />}
+                      onClick={handleGenerateInvoice}
+                      disabled={
+                        !selectedCustomer || cart.length === 0 || !canProceed || !invoiceDetails.dueDate || isProcessing
+                      }
+                      fullWidth
+                      sx={{
+                        bgcolor: '#4caf50',
+                        '&:hover': { bgcolor: '#45a049' }
+                      }}
+                    >
+                      {isProcessing ? "Processing..." : "Finalize Credit Sale"}
+                    </Button>
+                  </Box>
+
+                </Box>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Items Selection - RIGHT COLUMN */}
+          <div style={{ flex: 1, minWidth: '400px' }}>
+            <Card className="rounded-2xl shadow-sm" sx={{ border: '1px solid #4caf5030', bgcolor: '#4caf5005' }}>
+              <CardContent sx={{ p: 2.5 }}>
+                <Typography variant="h6" sx={{ color: '#4caf50', fontWeight: 700, mb: 2 }}>
+                  Select Items
+                </Typography>
+
+                {/* Search Bar */}
+                <Box sx={{ mb: 2 }}>
+                  <SearchInput
+                    placeholder="Search products by name or SKU..."
+                    value={query}
+                    onChange={setQuery}
+                  />
+                </Box>
+
+                {/* Product Grid */}
+                <Box sx={{ mb: 3 }}>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(4, 1fr)',
+                    gap: 10,
+                    maxHeight: '320px',
+                    overflowY: 'auto',
+                    padding: 4
+                  }}>
+                    {loadingProducts ? (
+                      <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem 0', color: '#64748b' }}>
+                        Loading products...
+                      </div>
+                    ) : pool.length === 0 ? (
+                      <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem 0', color: '#64748b' }}>
+                        No products found
+                      </div>
+                    ) : (
+                      pool.slice(0, 15).map((p) => (
+                        <Button
+                          key={p.sku}
+                          variant="outlined"
+                          onClick={() => handleProductClick(p)}
+                          size="small"
+                          sx={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            height: 80,
+                            p: 1.5,
+                            borderColor: '#4caf5050',
+                            textAlign: 'left',
+                            '&:hover': {
+                              borderColor: '#4caf50',
+                              bgcolor: '#4caf5010'
+                            }
+                          }}
+                        >
+                          <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', width: '100%' }}>{p.name}</span>
+                          <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+                            <span style={{ fontWeight: 700, fontSize: 13 }}>Rs {Number(p.selling_price ?? p.price ?? 0).toFixed(2)}</span>
+                            {p.variants && p.variants.length > 0 && (
+                              <Chip
+                                label={`${p.variants.length}v`}
+                                size="small"
+                                sx={{
+                                  height: 16,
+                                  fontSize: '0.6rem',
+                                  bgcolor: '#4caf5020',
+                                  color: '#4caf50'
+                                }}
+                              />
+                            )}
+                          </div>
+                        </Button>
+                      ))
+                    )}
+                  </div>
+                </Box>
+
+                <Divider sx={{ my: 3 }} />
+
+                {/* Cart Items */}
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, fontSize: '0.9rem' }}>
+                    Cart Items
+                  </Typography>
+                  {cart.length === 0 && (
+                    <Typography color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                      No items added yet
+                    </Typography>
+                  )}
+                  {cart.map((c, index) => {
+                    const itemKey = c.variant
+                      ? `${c.sku}-${c.variant.name}-${c.variant.value}-${index}`
+                      : `${c.sku}-${index}`
+                    return (
+                      <Box key={itemKey} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 2, borderRadius: 2, bgcolor: '#f8f9fa', mb: 2 }}>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {c.displayName || c.name}
+                            {c.variant && c.variant.additional_price !== 0 && (
+                              <span style={{ fontSize: '0.75rem', color: '#4caf50', marginLeft: '4px' }}>
+                                (+Rs {c.variant.additional_price.toFixed(2)})
+                              </span>
+                            )}
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+                            {c.qty} × Rs {c.price.toFixed(2)} = Rs {(c.qty * c.price).toFixed(2)}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <IconButton
+                            size="small"
+                            onClick={() =>
+                              setCart((prev) => {
+                                const cartKey = c.variant
+                                  ? `${c.sku}-${c.variant.name}-${c.variant.value}`
+                                  : c.sku
+                                return prev.map((p, i) => {
+                                  const pKey = p.variant
+                                    ? `${p.sku}-${p.variant.name}-${p.variant.value}`
+                                    : p.sku
+                                  return pKey === cartKey && i === index
+                                    ? { ...p, qty: Math.max(1, p.qty - 1) }
+                                    : p
+                                })
+                              })
+                            }
+                          >
+                            -
+                          </IconButton>
+                          <Typography sx={{ fontSize: '0.875rem', fontWeight: 500, minWidth: 24, textAlign: 'center' }}>{c.qty}</Typography>
+                          <IconButton
+                            size="small"
+                            onClick={() =>
+                              setCart((prev) => {
+                                const cartKey = c.variant
+                                  ? `${c.sku}-${c.variant.name}-${c.variant.value}`
+                                  : c.sku
+                                return prev.map((p, i) => {
+                                  const pKey = p.variant
+                                    ? `${p.sku}-${p.variant.name}-${p.variant.value}`
+                                    : p.sku
+                                  return pKey === cartKey && i === index ? { ...p, qty: p.qty + 1 } : p
+                                })
+                              })
+                            }
+                          >
+                            +
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => setCart((prev) => prev.filter((_, i) => i !== index))}
+                          >
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                    )
+                  })}
+                </Box>
+              </CardContent>
+            </Card>
+          </div>
+
+        </div>
       </Section>
 
       <Dialog open={showNewCustomer} onClose={() => setShowNewCustomer(false)} maxWidth="sm" fullWidth>
@@ -709,17 +740,38 @@ export default function CreditSales() {
       </Dialog>
 
       <Dialog open={showInvoice} onClose={() => setShowInvoice(false)} maxWidth="md" fullWidth>
-        <DialogTitle className="flex items-center justify-between">
-          <span>Credit Invoice Preview</span>
-          <IconButton onClick={() => setShowInvoice(false)}>
-            <Close />
-          </IconButton>
+        <DialogTitle sx={{ borderBottom: '2px solid #4caf50', bgcolor: '#f8f9fa' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#4caf50' }}>
+                {isPreviewMode ? "Invoice Preview" : "Credit Invoice"}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Your Inventory Management System
+              </Typography>
+            </Box>
+            <IconButton onClick={() => setShowInvoice(false)}>
+              <Close />
+            </IconButton>
+          </Box>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ p: 3 }}>
           {invoiceData && (
-            <div className="space-y-4" id="credit-invoice-print-area">
+            <Box sx={{ '@media print': { padding: 0 } }}>
+              {/* Success alert after sale is finalized */}
+              {!isPreviewMode && invoiceData && (
+                <Alert severity="success" sx={{ mb: 2 }}>
+                  Credit sale completed successfully! Customer balance updated.
+                </Alert>
+              )}
 
-              <Grid container spacing={2}>
+              {isPreviewMode && (
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  This is a preview. Click "Create Credit Invoice" to finalize the sale.
+                </Alert>
+              )}
+
+              <Grid container spacing={2} sx={{ mb: 3 }}>
                 <Grid item xs={6}>
                   <Typography variant="caption" color="text.secondary">
                     Invoice Number
@@ -771,63 +823,65 @@ export default function CreditSales() {
                 )}
               </Grid>
 
-              <Divider />
+              <Divider sx={{ my: 3 }} />
 
-              <div>
-                <Typography variant="subtitle2" className="font-semibold mb-2">
+              {/* Items Table */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: '#4caf50' }}>
                   Items
                 </Typography>
-                {invoiceData.items?.map((item, i) => (
-                  <div key={index} className="flex justify-between">
-                    <span>
-                      {item.name} × {item.quantity}
-                    </span>
-                    <span className="font-medium">Rs {item.total.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
+                <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '2fr 0.5fr 1fr 1fr', gap: 2, p: 1.5, bgcolor: '#f8f9fa', borderBottom: '1px solid #e0e0e0', fontWeight: 600, fontSize: '0.875rem' }}>
+                    <Box>Item</Box>
+                    <Box sx={{ textAlign: 'center' }}>Qty</Box>
+                    <Box sx={{ textAlign: 'right' }}>Price</Box>
+                    <Box sx={{ textAlign: 'right' }}>Total</Box>
+                  </Box>
+                  {invoiceData.items?.map((item, i) => (
+                    <Box key={i} sx={{ display: 'grid', gridTemplateColumns: '2fr 0.5fr 1fr 1fr', gap: 2, p: 1.5, borderBottom: i < invoiceData.items.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.875rem', fontWeight: 500 }}>{item.name}</Typography>
+                      </Box>
+                      <Box sx={{ textAlign: 'center', fontSize: '0.875rem' }}>{item.quantity}</Box>
+                      <Box sx={{ textAlign: 'right', fontSize: '0.875rem' }}>Rs {item.price?.toFixed(2) || (item.total / item.quantity).toFixed(2)}</Box>
+                      <Box sx={{ textAlign: 'right', fontSize: '0.875rem', fontWeight: 600 }}>Rs {item.total.toFixed(2)}</Box>
+                    </Box>
+                  ))}
+                </Paper>
+              </Box>
 
-              <Divider />
-
-              <div className="space-y-1">
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span>Rs {invoiceData.subtotal.toFixed(2)}</span>
-                </div>
+              {/* Totals Section */}
+              <Box sx={{ bgcolor: '#f8f9fa', p: 2.5, borderRadius: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem' }}>
+                  <Typography>Subtotal</Typography>
+                  <Typography sx={{ fontWeight: 500 }}>Rs {invoiceData.subtotal.toFixed(2)}</Typography>
+                </Box>
                 {invoiceData.discount > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount</span>
-                    <span>-Rs {invoiceData.discount.toFixed(2)}</span>
-                  </div>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1.5, fontSize: '0.875rem', color: '#4caf50' }}>
+                    <Typography>Discount</Typography>
+                    <Typography sx={{ fontWeight: 500 }}>-Rs {invoiceData.discount.toFixed(2)}</Typography>
+                  </Box>
                 )}
-                {/* Tax removed per requirements */}
-                <div className="flex justify-between text-lg font-semibold">
-                  <span>Total</span>
-                  <span>Rs {invoiceData.total.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
+                <Divider sx={{ my: 1.5 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography sx={{ fontSize: '1.125rem', fontWeight: 700 }}>Total</Typography>
+                  <Typography sx={{ fontSize: '1.125rem', fontWeight: 700, color: '#4caf50' }}>Rs {invoiceData.total.toFixed(2)}</Typography>
+                </Box>
+              </Box>
+
+              {/* Thank you message */}
+              <Box sx={{ mt: 3, textAlign: 'center', color: 'text.secondary' }}>
+                <Typography variant="body2">Thank you for your business!</Typography>
+              </Box>
+            </Box>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button 
-            variant="outlined" 
-            onClick={() => {
-              const printContent = document.getElementById('credit-invoice-print-area')
-              const windowPrint = window.open('', '', 'width=800,height=600')
-              windowPrint.document.write('<html><head><title>Credit Invoice</title>')
-              windowPrint.document.write('<style>body{font-family:Arial,sans-serif;padding:20px}@media print{body{padding:0}}</style>')
-              windowPrint.document.write('</head><body>')
-              windowPrint.document.write(printContent.innerHTML)
-              windowPrint.document.write('</body></html>')
-              windowPrint.document.close()
-              windowPrint.print()
-            }}
-          >
-            Print Invoice
+        <DialogActions sx={{ p: 2, borderTop: '1px solid #e0e0e0' }}>
+          <Button onClick={() => setShowInvoice(false)}>
+            Close
           </Button>
-          <Button variant="contained" onClick={handleCompleteSale}>
-            Complete Credit Sale
+          <Button variant="outlined" onClick={handlePrintInvoice}>
+            Print Invoice
           </Button>
         </DialogActions>
       </Dialog>

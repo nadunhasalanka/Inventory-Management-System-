@@ -16,18 +16,36 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
 
-    // Total Sales (current month)
+    // Total Sales (current month) - using correct status values
     const salesThisMonth = await SalesOrder.aggregate([
         {
             $match: {
-                created_at: { $gte: startOfMonth },
-                status: { $in: ['Pending', 'Processing', 'Shipped', 'Delivered'] }
+                createdAt: { $gte: startOfMonth },
+                status: { $in: ['New', 'Awaiting Fulfillment', 'Fulfilled', 'Partially Returned'] }
+            }
+        },
+        {
+            $addFields: {
+                calculatedTotal: {
+                    $add: [
+                        {
+                            $sum: {
+                                $map: {
+                                    input: '$line_items',
+                                    as: 'item',
+                                    in: '$$item.total_price'
+                                }
+                            }
+                        },
+                        { $ifNull: ['$shipping_details.shipping_cost', 0] }
+                    ]
+                }
             }
         },
         {
             $group: {
                 _id: null,
-                total: { $sum: '$grand_total' },
+                total: { $sum: '$calculatedTotal' },
                 count: { $sum: 1 }
             }
         }
@@ -36,14 +54,32 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
     const salesLastMonth = await SalesOrder.aggregate([
         {
             $match: {
-                created_at: { $gte: startOfLastMonth, $lte: endOfLastMonth },
-                status: { $in: ['Pending', 'Processing', 'Shipped', 'Delivered'] }
+                createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+                status: { $in: ['New', 'Awaiting Fulfillment', 'Fulfilled', 'Partially Returned'] }
+            }
+        },
+        {
+            $addFields: {
+                calculatedTotal: {
+                    $add: [
+                        {
+                            $sum: {
+                                $map: {
+                                    input: '$line_items',
+                                    as: 'item',
+                                    in: '$$item.total_price'
+                                }
+                            }
+                        },
+                        { $ifNull: ['$shipping_details.shipping_cost', 0] }
+                    ]
+                }
             }
         },
         {
             $group: {
                 _id: null,
-                total: { $sum: '$grand_total' }
+                total: { $sum: '$calculatedTotal' }
             }
         }
     ]);
@@ -52,10 +88,10 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
     const lastSales = salesLastMonth[0]?.total || 0;
     const salesChange = lastSales > 0 ? ((currentSales - lastSales) / lastSales) * 100 : 0;
 
-    // Total Customers
-    const totalCustomers = await Customer.countDocuments({ is_active: true });
+    // Total Customers (all customers since there's no is_active field)
+    const totalCustomers = await Customer.countDocuments({});
 
-    // Low Stock Items (below reorder_level)
+    // Low Stock Items (below reorder_point since that's what Product model uses)
     const lowStockItems = await InventoryStock.aggregate([
         {
             $lookup: {
@@ -68,7 +104,7 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
         { $unwind: '$product' },
         {
             $match: {
-                $expr: { $lt: ['$current_quantity', '$product.reorder_level'] }
+                $expr: { $lt: ['$current_quantity', '$product.reorder_point'] }
             }
         },
         { $count: 'count' }
@@ -76,9 +112,9 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
 
     const lowStockCount = lowStockItems[0]?.count || 0;
 
-    // Pending Orders
+    // Pending Orders - using correct status values
     const pendingOrders = await SalesOrder.countDocuments({
-        status: { $in: ['Pending', 'Processing'] }
+        status: { $in: ['New', 'Awaiting Fulfillment'] }
     });
 
     // Revenue by Category (last 30 days)
@@ -86,8 +122,8 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
     const revenueByCategory = await SalesOrder.aggregate([
         {
             $match: {
-                created_at: { $gte: thirtyDaysAgo },
-                status: { $in: ['Delivered', 'Shipped'] }
+                createdAt: { $gte: thirtyDaysAgo },
+                status: { $in: ['Fulfilled', 'Partially Returned'] }
             }
         },
         { $unwind: '$line_items' },
@@ -123,8 +159,8 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
     const topProducts = await SalesOrder.aggregate([
         {
             $match: {
-                created_at: { $gte: thirtyDaysAgo },
-                status: { $in: ['Delivered', 'Shipped'] }
+                createdAt: { $gte: thirtyDaysAgo },
+                status: { $in: ['Fulfilled', 'Partially Returned'] }
             }
         },
         { $unwind: '$line_items' },
@@ -145,27 +181,137 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
     const salesTrend = await SalesOrder.aggregate([
         {
             $match: {
-                created_at: { $gte: sevenDaysAgo }
+                createdAt: { $gte: sevenDaysAgo }
+            }
+        },
+        {
+            $addFields: {
+                calculatedTotal: {
+                    $add: [
+                        {
+                            $sum: {
+                                $map: {
+                                    input: '$line_items',
+                                    as: 'item',
+                                    in: '$$item.total_price'
+                                }
+                            }
+                        },
+                        { $ifNull: ['$shipping_details.shipping_cost', 0] }
+                    ]
+                }
             }
         },
         {
             $group: {
                 _id: {
-                    $dateToString: { format: '%Y-%m-%d', date: '$created_at' }
+                    $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
                 },
-                sales: { $sum: '$grand_total' },
+                sales: { $sum: '$calculatedTotal' },
                 orders: { $sum: 1 }
             }
         },
         { $sort: { _id: 1 } }
     ]);
 
-    // Recent Activity (last 10 audit logs)
-    const recentActivity = await AuditLog.find()
-        .sort({ timestamp: -1 })
-        .limit(10)
-        .populate('user_id', 'first_name last_name email username')
-        .lean();
+    // Recent Activity (last 10 transactions instead of audit logs)
+    let recentActivity = [];
+    try {
+        recentActivity = await Transaction.find()
+            .sort({ timestamp: -1 })
+            .limit(10)
+            .populate('product_id', 'name sku')
+            .populate('location_id', 'location_name')
+            .populate('user_id', 'first_name last_name email username')
+            .lean();
+    } catch (error) {
+        console.log('Could not fetch recent activity:', error.message);
+    }
+
+    // Payment Method Breakdown (Cash vs Credit sales)
+    const paymentBreakdown = await SalesOrder.aggregate([
+        {
+            $match: {
+                createdAt: { $gte: startOfMonth },
+                status: { $in: ['New', 'Awaiting Fulfillment', 'Fulfilled', 'Partially Returned'] }
+            }
+        },
+        {
+            $addFields: {
+                calculatedTotal: {
+                    $add: [
+                        {
+                            $sum: {
+                                $map: {
+                                    input: '$line_items',
+                                    as: 'item',
+                                    in: '$$item.total_price'
+                                }
+                            }
+                        },
+                        { $ifNull: ['$shipping_details.shipping_cost', 0] }
+                    ]
+                }
+            }
+        },
+        {
+            $group: {
+                _id: '$payment_type',
+                total: { $sum: '$calculatedTotal' },
+                count: { $sum: 1 }
+            }
+        }
+    ]);
+
+    const cashSales = paymentBreakdown.find(p => p._id === 'Cash') || { total: 0, count: 0 };
+    const creditSales = paymentBreakdown.find(p => p._id === 'Credit') || { total: 0, count: 0 };
+
+    // Outstanding Receivables (sum of credit_outstanding from all orders)
+    const receivablesData = await SalesOrder.aggregate([
+        {
+            $match: {
+                payment_type: { $in: ['Credit', 'Split'] },
+                credit_outstanding: { $gt: 0 }
+            }
+        },
+        {
+            $group: {
+                _id: '$customer_id',
+                totalOutstanding: { $sum: '$credit_outstanding' }
+            }
+        }
+    ]);
+
+    const totalReceivables = receivablesData.reduce((sum, r) => sum + r.totalOutstanding, 0);
+    const receivablesCount = receivablesData.length;
+
+    // Inventory Value (sum of all products * quantity in stock)
+    const inventoryValue = await InventoryStock.aggregate([
+        {
+            $lookup: {
+                from: 'products',
+                localField: 'product_id',
+                foreignField: '_id',
+                as: 'product'
+            }
+        },
+        { $unwind: '$product' },
+        {
+            $group: {
+                _id: null,
+                totalValue: {
+                    $sum: {
+                        $multiply: ['$current_quantity', '$product.selling_price']
+                    }
+                }
+            }
+        }
+    ]);
+
+    const totalInventoryValue = inventoryValue[0]?.totalValue || 0;
+
+    // Total Products Count
+    const totalProducts = await Product.countDocuments({});
 
     res.json({
         success: true,
@@ -184,7 +330,27 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
                 },
                 pendingOrders: {
                     value: pendingOrders
+                },
+                totalProducts: {
+                    value: totalProducts
+                },
+                creditOutstanding: {
+                    value: totalReceivables,
+                    count: receivablesCount
                 }
+            },
+            financial: {
+                totalRevenue: currentSales,
+                cashRevenue: cashSales.total,
+                creditRevenue: creditSales.total,
+                receivables: {
+                    value: totalReceivables,
+                    count: receivablesCount
+                }
+            },
+            inventory: {
+                totalValue: totalInventoryValue,
+                lowStockCount: lowStockCount
             },
             revenueByCategory,
             topProducts,
@@ -365,9 +531,9 @@ exports.getSalesSummary = asyncHandler(async (req, res) => {
     };
 
     if (startDate || endDate) {
-        match.created_at = {};
-        if (startDate) match.created_at.$gte = new Date(startDate);
-        if (endDate) match.created_at.$lte = new Date(endDate);
+        match.createdAt = {};
+        if (startDate) match.createdAt.$gte = new Date(startDate);
+        if (endDate) match.createdAt.$lte = new Date(endDate);
     }
 
     // Get all sales orders with line items
@@ -438,9 +604,9 @@ exports.getAllSales = asyncHandler(async (req, res) => {
 
     // Date filter
     if (startDate || endDate) {
-        match.created_at = {};
-        if (startDate) match.created_at.$gte = new Date(startDate);
-        if (endDate) match.created_at.$lte = new Date(endDate);
+        match.createdAt = {};
+        if (startDate) match.createdAt.$gte = new Date(startDate);
+        if (endDate) match.createdAt.$lte = new Date(endDate);
     }
 
     // Payment status filter
@@ -454,7 +620,7 @@ exports.getAllSales = asyncHandler(async (req, res) => {
     // Fetch sales with pagination
     const sales = await SalesOrder.find(match)
         .populate('customer_id', 'name email phone')
-        .sort({ created_at: -1 })
+        .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
         .lean();
@@ -490,8 +656,8 @@ exports.getAllSales = asyncHandler(async (req, res) => {
         creditSales: 0
     };
 
-    analytics.averageOrderValue = analytics.totalOrders > 0 
-        ? analytics.totalRevenue / analytics.totalOrders 
+    analytics.averageOrderValue = analytics.totalOrders > 0
+        ? analytics.totalRevenue / analytics.totalOrders
         : 0;
 
     // Payment status breakdown

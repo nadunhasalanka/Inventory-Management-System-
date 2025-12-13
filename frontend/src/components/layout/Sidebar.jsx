@@ -35,7 +35,7 @@ export default function Sidebar({ currentUser, tabs, active, onSelect, mobileOpe
           lastExpandedRef.current = Math.min(Math.max(parsed, MIN_WIDTH), MAX_WIDTH)
         }
       }
-    } catch {}
+    } catch { }
   }, [])
 
   // Persist
@@ -45,7 +45,7 @@ export default function Sidebar({ currentUser, tabs, active, onSelect, mobileOpe
         localStorage.setItem("sidebarCollapsed", collapsed ? "true" : "false")
         localStorage.setItem("sidebarWidth", String(width))
       }
-    } catch {}
+    } catch { }
   }, [collapsed, width])
 
   const onMouseMove = (e) => {
@@ -106,7 +106,7 @@ export default function Sidebar({ currentUser, tabs, active, onSelect, mobileOpe
 
           {/* User Info Card - Only when expanded */}
           {!collapsed && (
-            <div className="px-3 py-3 mb-3 mx-2 bg-accent rounded-xl">
+            <div className="px-3 py-3 mb-3 mx-2 mt-3 bg-accent rounded-xl">
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-accent-foreground truncate">

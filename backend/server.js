@@ -17,6 +17,7 @@ const inventoryRoutes = require('./routes/inventory.routes');
 const stockTransferRoutes = require('./routes/stockTransfer.routes');
 const purchaseOrderRoutes = require('./routes/purchaseOrder.routes');
 const salesOrderRoutes = require('./routes/salesOrder.routes');
+const salesRoutes = require('./routes/sales.routes');
 const paymentRoutes = require('./routes/payment.routes');
 // Legacy returnsExchange.routes is replaced by new returns.routes (refund/exchange handling)
 let returnsRoutes;
@@ -93,6 +94,9 @@ app.use('/api/purchase-orders', purchaseOrderRoutes);
 
 // Get an order (both credit and cash)
 app.use('/api/sales-orders', salesOrderRoutes);
+
+// Sales history and analytics
+app.use('/api/sales', salesRoutes);
 
 // Payment Routes
 app.use('/api/payments', paymentRoutes);

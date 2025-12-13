@@ -160,31 +160,6 @@ const TransactionLogs = () => {
         </CardContent>
       </Card>
 
-      {/* Summary Stats */}
-      {summary.length > 0 && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Summary by Transaction Type
-            </Typography>
-            <Grid container spacing={2}>
-              {summary.map((stat) => (
-                <Grid item xs={6} sm={4} md={2} key={stat._id}>
-                  <Box textAlign="center">
-                    <Typography variant="body2" color="textSecondary">
-                      {stat._id}
-                    </Typography>
-                    <Typography variant="h6">{stat.count}</Typography>
-                    <Typography variant="caption" color="textSecondary">
-                      Qty: {stat.totalQuantity}
-                    </Typography>
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Transactions Table */}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -245,7 +220,7 @@ const TransactionLogs = () => {
                     <TableCell align="right">{tx.balance_after}</TableCell>
                     <TableCell>
                       <Typography variant="body2">
-                        {tx.user_id 
+                        {tx.user_id
                           ? `${tx.user_id.first_name || ''} ${tx.user_id.last_name || ''}`.trim() || tx.user_id.username || tx.user_id.email
                           : 'System'}
                       </Typography>

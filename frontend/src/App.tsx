@@ -30,6 +30,7 @@ import MraCompliancePage from './pages/app/mra-compliance/page'
 import AddEditPage from './pages/app/addedit/page'
 import TransactionLogsPage from './pages/app/transactions/page'
 import AllPaymentsPage from './pages/app/payments/page'
+import SalesHistoryPage from './pages/app/sales-history/page'
 
 function App() {
   return (
@@ -70,6 +71,7 @@ function App() {
             <Route path="/addedit" element={<AddEditPage />} />
             <Route path="/transactions" element={<TransactionLogsPage />} />
             <Route path="/payments" element={<AllPaymentsPage />} />
+            <Route path="/sales-history" element={<SalesHistoryPage />} />
           </Route>
 
           {/* Catch all - redirect to dashboard */}

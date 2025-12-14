@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LumberAI - Market Overrides</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Sidebar Transitions */
+        .sidebar {
+            transition: width 0.3s ease;
+        }
+
+        .sidebar.collapsed {
+            width: 5rem;
+        }
+
+        .main-content {
+            transition: margin-left 0.3s ease;
+        }
+
+        .main-content.expanded {
+            margin-left: 5rem;
+        }
+
+        .sidebar-text {
+            transition: opacity 0.2s ease;
+        }
+
+        .sidebar.collapsed .sidebar-text {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-slate-800">
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- SIDEBAR -->
+        <aside id="sidebar" class="sidebar w-64 bg-slate-900 text-white flex flex-col fixed h-full z-10">
+            <!-- Header with Logo and Toggle -->
+            <div class="h-20 flex items-center justify-between px-6 border-b border-slate-800">
+                <div class="flex items-center">
+                    <i class="fas fa-tree text-green-400 text-2xl mr-3"></i>
+                    <span class="sidebar-text text-xl font-bold tracking-wide">LumberAI</span>
+                </div>
+                <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white focus:outline-none">
+                    <i id="toggleIcon" class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+
+            <nav class="flex-1 py-6 px-3 space-y-1">
+                <a href="index.html"
+                    class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition-colors">
+                    <i class="fas fa-calculator w-6 text-center mr-3 text-lg"></i>
+                    <span class="sidebar-text font-medium">Predict Cost</span>
+                </a>
+                <a href="history.html"
+                    class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition-colors">
+                    <i class="fas fa-history w-6 text-center mr-3 text-lg"></i>
+                    <span class="sidebar-text font-medium">History Log</span>
+                </a>
+                <a href="overrides.html"
+                    class="flex items-center px-4 py-3 bg-blue-600 rounded-lg text-white group transition-colors">
+                    <i class="fas fa-sliders-h w-6 text-center mr-3 text-lg"></i>
+                    <span class="sidebar-text font-medium">Market Overrides</span>
+                </a>
+                <a href="settings.html"
+                    class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition-colors">
+                    <i class="fas fa-cog w-6 text-center mr-3 text-lg"></i>
+                    <span class="sidebar-text font-medium">Settings</span>
+                </a>
+            </nav>
+
+            <div class="p-4 border-t border-slate-800">
+                <button
+                    class="w-full flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition-colors">
+                    <i class="fas fa-sign-out-alt w-6 text-center mr-3 text-lg"></i>
+                    <span class="sidebar-text font-medium">Logout</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <div id="mainContent" class="main-content flex-1 flex flex-col ml-64">
+
+            <!-- TOP NAVIGATION BAR -->
+            <header class="h-20 bg-white border-b border-gray-200 flex items-center justify-end px-8 shadow-sm">
+                <div class="flex items-center space-x-6">
+                    <!-- Notification Icon -->
+                    <button class="relative text-gray-400 hover:text-gray-600 transition-colors focus:outline-none">
+                        <i class="fas fa-bell text-xl"></i>
+                        <span
+                            class="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">3</span>
+                    </button>
+
+                    <!-- Profile Section with Name & Email -->
+                    <div
+                        class="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 px-3 py-2 rounded-lg transition-colors">
+                        <div
+                            class="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold">
+                            JD
+                        </div>
+                        <div class="text-left">
+                            <p class="text-sm font-semibold text-gray-800">John Doe</p>
+                            <p class="text-xs text-gray-500">john.doe@lumber.ai</p>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- DASHBOARD CONTENT -->
+            <main class="flex-1 overflow-y-auto p-10">
+
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h1 class="text-3xl font-bold text-slate-900 mb-1">Market Data Configuration</h1>
+                        <p class="text-gray-500">Override live market indicators for custom predictions</p>
+                    </div>
+                    <button class="text-sm text-gray-500 hover:text-blue-600 font-medium transition-colors">
+                        <i class="fas fa-sync-alt mr-1"></i> Reset to Live Defaults
+                    </button>
+                </div>
+
+                <!-- Market Data Overrides -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 mb-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-6">Market Data Overrides</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                        <!-- Lumber Futures Price -->
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="block text-sm font-medium text-gray-700">Lumber Futures Price
+                                    (LBS=F)</label>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs text-gray-500" id="label-lumber">Live</span>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" class="sr-only peer"
+                                            onchange="toggleOverride(this, 'lumber')">
+                                        <div
+                                            class="w-11 h-6 bg-green-500 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600">
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="relative">
+                                <div
+                                    class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                    $</div>
+                                <input type="number" id="input-lumber" value="560.00" step="0.01" disabled
+                                    class="pl-7 w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all text-gray-700 disabled:bg-gray-50 disabled:cursor-not-allowed">
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">Live from Yahoo Finance</p>
+                        </div>
+
+                        <!-- Construction CPI -->
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="block text-sm font-medium text-gray-700">Construction CPI</label>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs text-gray-500" id="label-cpi">Live</span>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" class="sr-only peer"
+                                            onchange="toggleOverride(this, 'cpi')">
+                                        <div
+                                            class="w-11 h-6 bg-green-500 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600">
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                            <input type="number" id="input-cpi" value="330.5" step="0.1" disabled
+                                class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all text-gray-700 disabled:bg-gray-50 disabled:cursor-not-allowed">
+                        </div>
+
+                        <!-- 30Y Mortgage Rate -->
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="block text-sm font-medium text-gray-700">30Y Mortgage Rate (%)</label>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs text-gray-500" id="label-mortgage">Live</span>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" class="sr-only peer"
+                                            onchange="toggleOverride(this, 'mortgage')">
+                                        <div
+                                            class="w-11 h-6 bg-green-500 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600">
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                            <input type="number" id="input-mortgage" value="7.0" step="0.1" disabled
+                                class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all text-gray-700 disabled:bg-gray-50 disabled:cursor-not-allowed">
+                        </div>
+
+                        <!-- Plywood Index -->
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="block text-sm font-medium text-gray-700">Plywood Index (OSB)</label>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs text-gray-500" id="label-plywood">Live</span>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" class="sr-only peer"
+                                            onchange="toggleOverride(this, 'plywood')">
+                                        <div
+                                            class="w-11 h-6 bg-green-500 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600">
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="relative">
+                                <div
+                                    class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                    $</div>
+                                <input type="number" id="input-plywood" value="280.00" step="0.01" disabled
+                                    class="pl-7 w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all text-gray-700 disabled:bg-gray-50 disabled:cursor-not-allowed">
+                            </div>
+                        </div>
+
+                        <!-- Housing Starts -->
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="block text-sm font-medium text-gray-700">Housing Starts (1000s)</label>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs text-gray-500" id="label-housing">Live</span>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" class="sr-only peer"
+                                            onchange="toggleOverride(this, 'housing')">
+                                        <div
+                                            class="w-11 h-6 bg-green-500 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600">
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                            <input type="number" id="input-housing" value="1300" step="1" disabled
+                                class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all text-gray-700 disabled:bg-gray-50 disabled:cursor-not-allowed">
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-gray-400 mt-2">Last updated: Today, 9:00 AM</p>
+
+                    <!-- Action Buttons -->
+                    <div class="flex justify-end pt-6 mt-6 border-t border-gray-100">
+                        <button
+                            class="bg-gray-100 text-gray-700 font-medium py-3 px-6 rounded-lg mr-4 hover:bg-gray-200 transition-colors">Cancel</button>
+                        <button
+                            class="bg-blue-600 text-white font-semibold py-3 px-8 rounded-lg hover:bg-blue-700 shadow-md transition-all">
+                            <i class="fas fa-save mr-2"></i>Apply Overrides
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Market Data Trends -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 mb-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-6">Market Data Trends (6 Months)</h3>
+
+                    <canvas id="marketTrendsChart" height="100"></canvas>
+                </div>
+
+
+
+            </main>
+        </div>
+    </div>
+
+    <!-- Sidebar Toggle Script -->
+    <script>
+        // Toggle Live/Override for market data fields
+        function toggleOverride(checkbox, fieldId) {
+            const input = document.getElementById('input-' + fieldId);
+            const label = document.getElementById('label-' + fieldId);
+
+            if (checkbox.checked) {
+                // Override mode
+                input.disabled = false;
+                label.textContent = 'Override';
+                input.focus();
+            } else {
+                // Live mode
+                input.disabled = true;
+                label.textContent = 'Live';
+            }
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            const toggleIcon = document.getElementById('toggleIcon');
+
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('expanded');
+
+            // Change icon
+            if (sidebar.classList.contains('collapsed')) {
+                toggleIcon.classList.remove('fa-bars');
+                toggleIcon.classList.add('fa-chevron-right');
+            } else {
+                toggleIcon.classList.remove('fa-chevron-right');
+                toggleIcon.classList.add('fa-bars');
+            }
+        }
+
+        // Market Trends Chart
+        const ctx = document.getElementById('marketTrendsChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['July', 'August', 'September', 'October', 'November', 'December'],
+                datasets: [
+                    {
+                        label: 'Lumber Futures ($)',
+                        data: [540, 548, 555, 552, 558, 560],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Construction CPI',
+                        data: [325.2, 326.8, 328.1, 329.0, 329.8, 330.5],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Plywood Index ($)',
+                        data: [265, 270, 275, 272, 278, 280],
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Mortgage Rate (%)',
+                        data: [6.8, 6.9, 7.1, 7.0, 7.0, 7.0],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.4,
+                        fill: false,
+                        borderDash: [5, 5]
+                    },
+                    {
+                        label: 'Housing Starts (1000s)',
+                        data: [1280, 1290, 1295, 1285, 1295, 1300],
+                        borderColor: '#8b5cf6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 15
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Value'
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LumberAI - History</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Sidebar Transitions */
+        .sidebar {
+            transition: width 0.3s ease;
+        }
+
+        .sidebar.collapsed {
+            width: 5rem;
+        }
+
+        .main-content {
+            transition: margin-left 0.3s ease;
+        }
+
+        .main-content.expanded {
+            margin-left: 5rem;
+        }
+
+        .sidebar-text {
+            transition: opacity 0.2s ease;
+        }
+
+        .sidebar.collapsed .sidebar-text {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-slate-800">
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- SIDEBAR -->
+        <aside id="sidebar" class="sidebar w-64 bg-slate-900 text-white flex flex-col fixed h-full z-10">
+            <!-- Header with Logo and Toggle -->
+            <div class="h-20 flex items-center justify-between px-6 border-b border-slate-800">
+                <div class="flex items-center">
+                    <i class="fas fa-tree text-green-400 text-2xl mr-3"></i>
+                    <span class="sidebar-text text-xl font-bold tracking-wide">LumberAI</span>
+                </div>
+                <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white focus:outline-none">
+                    <i id="toggleIcon" class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+
+            <nav class="flex-1 py-6 px-3 space-y-1">
+                <a href="index.html"
+                    class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition-colors">
+                    <i class="fas fa-calculator w-6 text-center mr-3 text-lg"></i>
+                    <span class="sidebar-text font-medium">Predict Cost</span>
+                </a>
+                <a href="history.html"
+                    class="flex items-center px-4 py-3 bg-blue-600 rounded-lg text-white group transition-colors">
+                    <i class="fas fa-history w-6 text-center mr-3 text-lg"></i>
+                    <span class="sidebar-text font-medium">History Log</span>
+                </a>
+                <a href="overrides.html"
+                    class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition-colors">
+                    <i class="fas fa-sliders-h w-6 text-center mr-3 text-lg"></i>
+                    <span class="sidebar-text font-medium">Market Overrides</span>
+                </a>
+                <a href="settings.html"
+                    class="flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition-colors">
+                    <i class="fas fa-cog w-6 text-center mr-3 text-lg"></i>
+                    <span class="sidebar-text font-medium">Settings</span>
+                </a>
+            </nav>
+
+            <div class="p-4 border-t border-slate-800">
+                <button
+                    class="w-full flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition-colors">
+                    <i class="fas fa-sign-out-alt w-6 text-center mr-3 text-lg"></i>
+                    <span class="sidebar-text font-medium">Logout</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <div id="mainContent" class="main-content flex-1 flex flex-col ml-64">
+
+            <!-- TOP NAVIGATION BAR -->
+            <header class="h-20 bg-white border-b border-gray-200 flex items-center justify-end px-8 shadow-sm">
+                <div class="flex items-center space-x-6">
+                    <!-- Notification Icon -->
+                    <button class="relative text-gray-400 hover:text-gray-600 transition-colors focus:outline-none">
+                        <i class="fas fa-bell text-xl"></i>
+                        <span
+                            class="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">3</span>
+                    </button>
+
+                    <!-- Profile Section with Name & Email -->
+                    <div
+                        class="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 px-3 py-2 rounded-lg transition-colors">
+                        <div
+                            class="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold">
+                            JD
+                        </div>
+                        <div class="text-left">
+                            <p class="text-sm font-semibold text-gray-800">John Doe</p>
+                            <p class="text-xs text-gray-500">john.doe@lumber.ai</p>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- DASHBOARD CONTENT -->
+            <main class="flex-1 overflow-y-auto p-10">
+
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h1 class="text-3xl font-bold text-slate-900 mb-1">Project History & Bid Tracking</h1>
+                        <p class="text-gray-500">Track predictions vs actuals and monitor win/loss rates</p>
+                    </div>
+                    <button onclick="toggleForm()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all flex items-center">
+                        <i class="fas fa-plus mr-2"></i> Add New Project Log
+                    </button>
+                </div>
+
+                <!-- ADD NEW LOG FORM (Hidden by default) -->
+                <div id="addProjectForm" class="hidden bg-white border border-gray-200 rounded-xl p-8 mb-8 shadow-sm">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900">Add New Project Log</h3>
+                        <button onclick="toggleForm()" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Left Column -->
+                        <div class="space-y-4">
+                            <div>
+                                <label
+                                    class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Project
+                                    Name</label>
+                                <input type="text" placeholder="e.g. Vista Heights Phase 2"
+                                    class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-gray-700">
+                            </div>
+                            <div>
+                                <label
+                                    class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Date</label>
+                                <input type="date"
+                                    class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-gray-700">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Board
+                                    Footage (BF)</label>
+                                <input type="number" placeholder="50000"
+                                    class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-gray-700">
+                            </div>
+                            <div>
+                                <label
+                                    class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Square
+                                    Footage (SF)</label>
+                                <input type="number" placeholder="12000"
+                                    class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-gray-700">
+                            </div>
+                        </div>
+
+                        <!-- Right Column -->
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Unit
+                                    Count</label>
+                                <input type="number" placeholder="10"
+                                    class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-gray-700">
+                            </div>
+                            <div>
+                                <label
+                                    class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Building
+                                    Type</label>
+                                <select
+                                    class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-gray-700 bg-white">
+                                    <option>Multifamily</option>
+                                    <option>Single-Family</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label
+                                    class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Predicted
+                                    Cost ($)</label>
+                                <input type="number" placeholder="125000"
+                                    class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-gray-700">
+                            </div>
+                            <div>
+                                <label
+                                    class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Actual
+                                    Cost ($)</label>
+                                <input type="number" placeholder="122000"
+                                    class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-gray-700">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bid Status -->
+                    <div class="mt-6 pt-6 border-t border-gray-100">
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Bid
+                            Status</label>
+                        <div class="flex space-x-4">
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="bidStatus" value="won"
+                                    class="w-4 h-4 text-green-600 focus:ring-green-500">
+                                <span class="ml-2 text-sm font-medium text-gray-700">Won Bid</span>
+                            </label>
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="bidStatus" value="lost"
+                                    class="w-4 h-4 text-red-600 focus:ring-red-500">
+                                <span class="ml-2 text-sm font-medium text-gray-700">Lost Bid</span>
+                            </label>
+                            <label class="inline-flex items-center cursor-pointer">
+                                <input type="radio" name="bidStatus" value="pending"
+                                    class="w-4 h-4 text-yellow-600 focus:ring-yellow-500" checked>
+                                <span class="ml-2 text-sm font-medium text-gray-700">Pending</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button
+                        class="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg shadow-md hover:shadow-lg transition-all">
+                        <i class="fas fa-save mr-2"></i> Save Project Log
+                    </button>
+                </div>
+
+                <!-- HISTORY TABLE -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 mb-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-6">Historical Projects</h3>
+
+                    <div class="overflow-x-auto -mx-8">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600">Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600">Project</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600">Specs</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600">Type</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600">Predicted</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600">Actual</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600">Variance</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <!-- Row 1 -->
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">2025-12-10</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Sunset
+                                        Apartments</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        <div class="font-medium">50,000 BF</div>
+                                        <div class="text-gray-500 text-xs">12,000 SF / 10 units</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">Multifamily</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">$125,000
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <input type="number" value="122000"
+                                            class="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500">
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="text-sm font-medium text-gray-800">-2.4%</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <select
+                                            class="text-sm border border-gray-300 rounded px-3 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                                            <option value="won" selected>Won</option>
+                                            <option value="lost">Lost</option>
+                                            <option value="pending">Pending</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <!-- Row 2 -->
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">2025-12-08</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Hillside
+                                        Villa</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        <div class="font-medium">25,000 BF</div>
+                                        <div class="text-gray-500 text-xs">8,000 SF / 1 unit</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">Single-Family</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">$450,000
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <input type="number" value="460000"
+                                            class="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500">
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="text-sm font-medium text-gray-800">+2.2%</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <select
+                                            class="text-sm border border-gray-300 rounded px-3 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                                            <option value="won">Won</option>
+                                            <option value="lost" selected>Lost</option>
+                                            <option value="pending">Pending</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <!-- Row 3 -->
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">2025-12-05</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">City Block
+                                        A</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        <div class="font-medium">150,000 BF</div>
+                                        <div class="text-gray-500 text-xs">40,000 SF / 50 units</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">Multifamily</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">$1,200,000
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <input type="number" value="1250000"
+                                            class="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500">
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="text-sm font-medium text-gray-800">+4.1%</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <select
+                                            class="text-sm border border-gray-300 rounded px-3 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                                            <option value="won">Won</option>
+                                            <option value="lost">Lost</option>
+                                            <option value="pending" selected>Pending</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- Sidebar Toggle Script -->
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            const toggleIcon = document.getElementById('toggleIcon');
+
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('expanded');
+
+            // Change icon
+            if (sidebar.classList.contains('collapsed')) {
+                toggleIcon.classList.remove('fa-bars');
+                toggleIcon.classList.add('fa-chevron-right');
+            } else {
+                toggleIcon.classList.remove('fa-chevron-right');
+                toggleIcon.classList.add('fa-bars');
+            }
+        }
+
+        function toggleForm() {
+            const form = document.getElementById('addProjectForm');
+            form.classList.toggle('hidden');
+        }
+    </script>
+</body>
+
+</html>
